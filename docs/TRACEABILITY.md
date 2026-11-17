@@ -88,4 +88,4 @@ Recovery rests on three principles:
 
 `sdd status <feature>` shows the current state, the progress of every group and task, any interrupted action, the lock holder and the exact next command to run.
 
-`sdd resume` and `sdd clean` can throw work away and `sdd merge` changes your branch, so the permission rules and the `PreToolUse` hook installed by `sdd init --agent claude` deny them to the agent along with the approvals.
+`sdd resume` and `sdd clean` can throw work away and `sdd merge` changes your branch, so the permission rules and the `PreToolUse` hook installed by `sdd init --agent` deny them to the agent along with the approvals.

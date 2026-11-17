@@ -4,7 +4,7 @@ Quipu: Spec-Driven Development for coding agents
 ## 1. Project Overview
 **Quipu** (command `sdd`) is a lightweight, language-agnostic command-line tool that drives software development from explicit, version-controlled specifications. It is installed once as a single Go binary and initialized inside each project.
 
-`sdd` does not call any LLM itself. The reasoning comes from the **coding agent the user already runs**, such as Claude Code, Codex CLI or Gemini CLI, under the user's existing subscription. `sdd` is the deterministic engine around that agent: it owns the artifacts, the guardrails, the approval gates, the state, the audit trail, the isolated worktree, verification and commits. The agent reaches `sdd` through a local MCP server and through commands installed into the project.
+`sdd` does not call any LLM itself. The reasoning comes from the **coding agent the user already runs**, such as Claude Code, Codex CLI or Antigravity CLI, under the user's existing subscription. `sdd` is the deterministic engine around that agent: it owns the artifacts, the guardrails, the approval gates, the state, the audit trail, the isolated worktree, verification and commits. The agent reaches `sdd` through a local MCP server and through commands installed into the project.
 
 Together they move a feature through four gated phases:
 
@@ -19,7 +19,7 @@ For the full workflow see [WORKFLOW.md](WORKFLOW.md). For spec authoring rules s
 * **Specs are the source of truth.** Code is never generated blindly. Every change traces back to an approved, version-controlled markdown spec through stable requirement IDs.
 * **Humans own the gates.** The agent drafts, plans and implements. The user approves each spec, the plan and each implemented task group. Approvals are not available to the agent.
 * **The agent reasons, `sdd` decides.** Everything that must be true for the workflow to advance (lint, coverage, staleness, build and test results, commit trailers) is checked deterministically by `sdd`, never left to the agent's judgment.
-* **Agent agnostic.** Any agent that speaks MCP or can run shell commands can drive `sdd`. Claude Code is supported first; Codex CLI, Gemini CLI and agents that read `AGENTS.md` follow. Agent-specific knowledge lives in thin instruction files.
+* **Agent agnostic.** Any agent that speaks MCP or can run shell commands can drive `sdd`. `sdd init --agent` sets up Claude Code, Codex CLI and Antigravity CLI, and writes an `AGENTS.md` for any other agent. Agent-specific knowledge lives in thin instruction files.
 * **Language agnostic.** Language-specific knowledge lives in replaceable *profiles* and in the build and test commands declared by the technical spec.
 * **Everything is traceable and resumable.** Every action is journaled and every step is checkpointed. If the agent session ends, a new session continues from the recorded state.
 
@@ -43,8 +43,8 @@ For the full workflow see [WORKFLOW.md](WORKFLOW.md). For spec authoring rules s
    ┌──────────────────────────────┐            ┌──────────────────────────┐
    │  Host coding agent           │            │  User (terminal)         │
    │  Claude Code · Codex CLI ·   │            │  approvals, reviews,     │
-   │  Gemini CLI · …              │            │  status, trace           │
-   │  /sdd-* commands, AGENTS.md  │            └────────────┬─────────────┘
+   │  Antigravity CLI · …         │            │  status, trace           │
+   │  sdd-* skills, AGENTS.md     │            └────────────┬─────────────┘
    └──────────────┬───────────────┘                         │ sdd <command>
                   │ MCP over stdio (or shell commands)      │
    ┌──────────────▼──────────────────────────────────────────▼─────────────┐
@@ -93,18 +93,17 @@ Agent-facing output is kept compact on purpose, because it is read by the agent 
 1. Starting the Implement phase creates `.sdd/worktrees/<feature>` on branch `sdd/<feature>` from the current `HEAD`.
 2. The agent edits files in the worktree. When it reports a task done, `sdd` verifies it and makes a WIP checkpoint commit. When the group passes verification, its WIP commits are squashed into one group commit with `SDD-*` trailers.
 3. The user reviews after each group: `sdd approve` continues, `sdd revise -m "…"` records feedback for the agent to address.
-4. When validation is done, the user merges `sdd/<feature>` by their usual process (merge, PR, rebase). `sdd clean <feature>` removes the worktree.
+4. When validation is done, `sdd merge <feature>` merges `sdd/<feature>` into the project's branch, removes the worktree and commits the records. A user who merges their own way (PR, rebase) runs `sdd merge` afterwards to record it.
 5. After a failure the worktree is kept as-is for inspection and for `sdd resume`.
 
 ## 5. MVP Scope
-* **Agent:** Claude Code (MCP server registration, slash commands, permission rules), plus a generic `AGENTS.md` section usable by other agents.
+* **Agents:** Claude Code (MCP server registration, skills, permission rules, guard hook), Codex CLI and Antigravity CLI (M8: the same skills, MCP registration and guard hook in each agent's format), plus a generic `AGENTS.md` usable by other agents.
 * **Workflow:** all four phases for a single feature at a time, on a new (greenfield) project.
 * **Specs:** `specs/<feature>/functional.md`, `technical.md` and `plan.md`, using the embedded templates.
 * **Verification:** the build, lint, test and integration commands declared in the technical spec.
 * **Traceability and recovery:** journal, checkpoints, locks, `sdd status`, `sdd resume`, `sdd trace`, `sdd sync check`.
 
 ### Out of Scope (MVP)
-* Integration files for agents other than Claude Code (M8).
 * **API mode:** an agent loop inside `sdd` that calls LLM APIs directly, for unattended runs. A Claude provider was built for it (`internal/provider`, `internal/transcript`) and is kept, unused, for a possible future version.
 * Local model inference.
 * Running several features in parallel, remote or shared state, and a web UI.

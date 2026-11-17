@@ -6,7 +6,7 @@
 
 A *quipu* is the Inca record of knotted cords: each knot is a fact, and its place on the cord says how it connects to the rest. Quipu does the same for your code: every requirement is tied to its design, tasks, commits and tests, and every step is recorded.
 
-Quipu's command is `sdd`, a single-binary CLI that drives software development from approved specifications, together with the coding agent you already use (Claude Code first; Codex CLI, Gemini CLI and others later). `sdd` never calls an LLM itself: the agent does the reasoning under your existing subscription, and `sdd` owns the specs, the guardrails, the approval gates, verification, commits and the audit trail. The agent reaches it through a local MCP server and installed `/sdd-*` commands.
+Quipu's command is `sdd`, a single-binary CLI that drives software development from approved specifications, together with the coding agent you already use: Claude Code, Codex CLI, Antigravity CLI, or any agent that reads `AGENTS.md`. `sdd` never calls an LLM itself: the agent does the reasoning under your existing subscription, and `sdd` owns the specs, the guardrails, the approval gates, verification, commits and the audit trail. The agent reaches it through a local MCP server and installed `sdd-*` skills.
 
 You work in four gated phases:
 
@@ -17,7 +17,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M7 done: the full workflow, for new and existing projects.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-*` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Existing projects are adopted with `/sdd-adopt`, which documents the current code as baseline specs without changing it. Next: integrations for more agents (M8). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M8 in progress: more agents.** The full workflow, for new and existing projects, is verified end to end in Claude Code; Codex CLI and Antigravity CLI are set up by `sdd init --agent` and await their first real run. Specs, the plan and the implementation are done with your agent through the `sdd` MCP server and the `sdd-*` skills. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Existing projects are adopted with `/sdd-adopt`, which documents the current code as baseline specs without changing it. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -31,11 +31,18 @@ make install
 
 ```sh
 cd your-project        # a git repository
-sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and the Claude Code setup
-                          # (.mcp.json, /sdd-* skills, permission rules)
+sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and your agent's setup:
+                          # claude, codex, antigravity or generic (comma-separated for several)
 ```
 
-`sdd init` never modifies an existing file: it creates what is missing and prints what to add by hand for the rest (`sdd init --check` shows what is missing). Then, in Claude Code:
+| Agent | `--agent` | Skills run as | You run `sdd` commands |
+|---|---|---|---|
+| Claude Code | `claude` | `/sdd-spec` | in your terminal, or `! sdd …` in Claude Code |
+| Codex CLI | `codex` | `$sdd-spec` | in your terminal |
+| Antigravity CLI | `antigravity` | `/sdd-spec` | in your terminal |
+| Any other | `generic` (writes `AGENTS.md`) | — | in your terminal |
+
+`sdd init` never modifies an existing file: it creates what is missing and prints what to add by hand for the rest (`sdd init --check` shows what is missing). Setup details per agent are in [WORKFLOW.md](docs/WORKFLOW.md#agent-setup). Then, in Claude Code (in Codex, write `$sdd-spec` instead of `/sdd-spec`, and run the `sdd` lines in your terminal without the `!`):
 
 ```text
 /sdd-spec "User signup with email"     # the agent interviews you and drafts the functional spec

@@ -16,40 +16,81 @@ Every unit of work is a **feature**. Each feature lives in `specs/<feature>/` (a
 
 ## Who Does What
 
-The LLM work is done by the **host agent** the user already runs (Claude Code first; see [BRIEF.md](BRIEF.md)). `sdd` never calls a model. The split is the same in every phase:
+The LLM work is done by the **host agent** the user already runs (Claude Code, Codex CLI, Antigravity CLI or any agent that reads `AGENTS.md`; see [BRIEF.md](BRIEF.md)). `sdd` never calls a model. The split is the same in every phase:
 
 | Role | Does | Through |
 |---|---|---|
-| **Agent** | Interviews the user, drafts and edits specs and the plan, implements tasks, fixes failures | The `sdd` MCP server (or the CLI from its shell) and the installed `/sdd-*` commands |
+| **Agent** | Interviews the user, drafts and edits specs and the plan, implements tasks, fixes failures | The `sdd` MCP server (or the CLI from its shell) and the installed `sdd-*` skills |
 | **`sdd`** | Creates artifacts from templates, lints, checks sync and coverage, hands each task to the agent, verifies, commits, journals | Its own code, deterministically |
 | **User** | Answers the agent, approves specs and the plan, reviews each group | The `sdd` CLI in their terminal (in Claude Code, `! sdd …` also works) |
 
-Approval and review commands are human-only: they are not exposed as MCP tools, and the permission rules and hook installed by `sdd init --agent claude` deny them to the agent.
+Approval and review commands are human-only: they are not exposed as MCP tools, and the files installed by `sdd init --agent` deny them to the agent (see below).
 
 ### Agent setup
 
 **`sdd init` never modifies a file that already exists.** It creates the files that are missing; for each one that exists, it leaves it untouched and prints the snippet to add by hand (and `sdd init --check` reports what is still missing). Its own ephemeral paths are ignored through `.sdd/.gitignore`, so the project's `.gitignore` is not touched either.
 
-`sdd init --agent claude` sets up Claude Code:
+`--agent` takes one agent or a comma-separated list (`sdd init --agent codex,antigravity`); files that agents share, such as `AGENTS.md` and `.agents/skills/`, are written once.
+
+| | Claude Code | Codex CLI | Antigravity CLI (`agy`) | Other agents |
+|---|---|---|---|---|
+| `sdd init` | `--agent claude` | `--agent codex` | `--agent antigravity` | `--agent generic` |
+| MCP server | `.mcp.json` | `.codex/config.toml` | `.agents/mcp_config.json` | register `sdd mcp` (stdio) yourself |
+| Skills (`sdd-*`) | `.claude/skills/`, run as `/sdd-spec` | `.agents/skills/`, run as `$sdd-spec` | `.agents/skills/`, run as `/sdd-spec` | — |
+| Instructions | sent by the MCP server | `AGENTS.md` and the MCP server | `AGENTS.md` and the MCP server | `AGENTS.md` |
+| Guard hook (`sdd hook pre-tool-use`) | `.claude/settings.json` | `.codex/hooks.json` | `.agents/hooks.json` | — |
+| Command rules | `deny` in `.claude/settings.json` | `forbidden` in `.codex/rules/sdd.rules` | none at project level | — |
+| You run `sdd` commands | in your terminal, or `! sdd …` in Claude Code | in your terminal | in your terminal | in your terminal |
+| Verified in a real session | yes | not yet | not yet | — |
+
+The skills come from one source, so every agent gets the same instructions; only the way they receive their arguments differs. The MCP server also sends the workflow rules to the agent when it connects.
+
+**The guard hook.** Each agent runs `sdd hook pre-tool-use` before every shell command it issues. The hook denies any command that contains a human-only `sdd` command anywhere (`bash -c`, `env`, `xargs`, `$(…)`, a path to the binary), and answers in the agent's own format. Hooks run on the agent's tool calls only, never on the commands you type, which is what tells you apart from the agent: `sdd` cannot do it by itself (inside Claude Code, your `!` commands and the agent's share the same environment and neither has a terminal). The command rules are a second layer that matches the command as typed, so a wrapper such as `bash -c "sdd approve G2"` gets past them. Together they guard against mistakes and well-meant shortcuts, not against an agent set on getting around them (it could edit `state.json`); the approvals' git identity and the journal record who approved.
+
+#### Claude Code
+
+`sdd init --agent claude` installs:
 - `.mcp.json`: registers `sdd mcp` (stdio) as the `sdd` MCP server. Claude Code asks once to approve a project's MCP servers.
-- `.claude/skills/sdd-*/SKILL.md`: the `/sdd-*` commands below (Claude Code skills). Each one carries its own instructions, and the MCP server sends the workflow rules to the agent when it connects, so no change to `CLAUDE.md` is needed.
-- `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`) and `deny` rules for the approval and review commands (`Bash(sdd spec approve *)` and the like). Deny rules take precedence over any allow rule. They match the command as typed, so a wrapper such as `bash -c "sdd approve G2"` gets past them.
-- `.claude/settings.json` also installs a `PreToolUse` hook on the Bash tool, `sdd hook pre-tool-use`, which denies any command that contains a human-only `sdd` command anywhere (`bash -c`, `env`, `xargs`, `$(…)`, a path to the binary). Hooks run on the agent's tool calls only, not on the commands you type with `!`, so you keep approving with `! sdd approve G2`. `sdd` cannot tell you apart from the agent by itself: inside Claude Code both shells carry `CLAUDECODE=1` and the same `AI_AGENT`, and neither has a terminal.
+- `.claude/skills/sdd-*/SKILL.md`: the `/sdd-*` commands.
+- `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`), `deny` rules for the human-only commands (`Bash(sdd approve *)` and the like; deny rules take precedence over any allow rule) and the guard hook on the Bash tool.
 
-Together they guard against mistakes and well-meant shortcuts, not against an agent set on getting around them (it could edit `state.json`); the approvals' git identity and the journal record who approved.
+Restart Claude Code in the project and approve the `sdd` server. You can run `sdd` commands with `! sdd approve G2` inside Claude Code: the hook does not apply to them.
 
-`sdd init --agent generic` writes an `AGENTS.md` that explains the workflow to any agent that reads it, if the project has none. Integration files for more agents arrive in M8.
+#### Codex CLI
 
-| Slash command | Starts | Available |
+`sdd init --agent codex` installs:
+- `.codex/config.toml`: the `sdd` MCP server (`[mcp_servers.sdd]`), with its tools auto-approved (`default_tools_approval_mode = "auto"`; none of them approves anything).
+- `.agents/skills/sdd-*/SKILL.md`: the skills, run as `$sdd-spec <feature>` (or picked by Codex from their description).
+- `AGENTS.md`: the workflow, which Codex reads before any work.
+- `.codex/hooks.json`: the guard hook on `Bash` (the same format as Claude Code's).
+- `.codex/rules/sdd.rules`: `prefix_rule`s with `decision = "forbidden"` for the human-only commands.
+
+Codex loads `.codex/` only in trusted projects: trust the project when Codex asks, then review and trust the hook with `/hooks` (Codex skips a hook until its exact definition is trusted). Run the `sdd` commands in your own terminal.
+
+#### Antigravity CLI
+
+`sdd init --agent antigravity` installs:
+- `.agents/mcp_config.json`: the `sdd` MCP server. Check it with `/mcp`.
+- `.agents/skills/sdd-*/SKILL.md`: the skills, run as `/sdd-spec <feature>` (run `/skills reload` if `agy` was already open).
+- `AGENTS.md`: the workflow, which `agy` reads from the workspace.
+- `.agents/hooks.json`: the guard hook on `run_command`.
+
+Antigravity only reads command permission lists from your global settings, which `sdd init` does not touch, so the hook is the only project-level guard. If you want a second layer, add `"deny": ["command(sdd approve)", "command(sdd revise)", "command(sdd resume)", "command(sdd clean)", "command(sdd merge)", "command(sdd spec approve)", "command(sdd plan approve)"]` under `permissions` in `~/.gemini/antigravity-cli/settings.json`. `agy` has no shell mode: run the `sdd` commands in your own terminal.
+
+#### Other agents
+
+`sdd init --agent generic` writes an `AGENTS.md` that explains the workflow and lists the CLI commands. Register `sdd mcp` (stdio) as an MCP server if your agent supports it. There is no guard hook: rely on your agent's own permission settings to keep the human-only commands away from it. Gemini CLI reads `AGENTS.md` once it is listed in `context.fileName` in `.gemini/settings.json`.
+
+| Skill | Starts | Available |
 |---|---|---|
-| `/sdd-spec <feature or "Free text">` | Drafting the functional spec (creates the feature if needed) | M3 |
-| `/sdd-tech <feature>` | Drafting the technical spec | M3 |
-| `/sdd-plan <feature>` | Drafting the plan | M4 |
-| `/sdd-implement <feature>` | Implementing tasks until the current group is ready for review | M5 |
-| `/sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria | M6 |
-| `/sdd-adopt [area]` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
+| `sdd-spec <feature or "Free text">` | Drafting the functional spec (creates the feature if needed) | M3 |
+| `sdd-tech <feature>` | Drafting the technical spec | M3 |
+| `sdd-plan <feature>` | Drafting the plan | M4 |
+| `sdd-implement <feature>` | Implementing tasks until the current group is ready for review | M5 |
+| `sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria | M6 |
+| `sdd-adopt [area]` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
 
-Re-running `sdd init --agent claude` after upgrading `sdd` adds the commands of new milestones; existing ones are left as they are.
+This document writes them as `/sdd-spec`; in Codex they are `$sdd-spec`. Re-running `sdd init --agent <name>` after upgrading `sdd` adds the files of new milestones; existing ones are left as they are.
 
 ### MCP tools
 

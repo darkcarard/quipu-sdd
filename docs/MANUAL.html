@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-agent="claude">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -247,6 +247,17 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 @media (prefers-reduced-motion: no-preference) {
   .copy { transition: background .15s; }
 }
+
+/* Agent selector: commands and names adapt to the chosen agent. */
+.agent-pick { display: inline-flex; align-self: flex-start; width: fit-content; max-width: 100%; flex-wrap: wrap; gap: 4px; padding: 4px; margin-top: 6px; background: var(--sunken); border-radius: 999px; }
+.agent-pick button { font: inherit; font-size: 14px; font-weight: 500; border: 0; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.agent-pick button:hover { color: var(--ink); }
+.agent-pick button[aria-pressed="true"] { background: var(--surface); color: var(--agent); box-shadow: 0 1px 2px rgb(0 0 0 / .14); }
+.agent-pick button:focus-visible { outline: 2px solid var(--agent); outline-offset: 2px; }
+[data-only] { display: none !important; }
+html[data-agent="claude"] [data-only~="claude"],
+html[data-agent="codex"] [data-only~="codex"],
+html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !important; }
 </style>
 </head>
 <body>
@@ -280,7 +291,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     </div>
     <div class="triad" aria-label="The three roles">
       <div class="role you"><div class="dot">You</div><div><b>You decide</b><span>Answer the agent's questions, approve specs and the plan, review every group of code.</span></div></div>
-      <div class="role agent"><div class="dot">AI</div><div><b>Your agent writes</b><span>Claude Code drafts the specs and the plan, then writes the code task by task.</span></div></div>
+      <div class="role agent"><div class="dot">AI</div><div><b>Your agent writes</b><span><span class="ag">Claude Code</span> drafts the specs and the plan, then writes the code task by task.</span></div></div>
       <div class="role sdd"><div class="dot">sdd</div><div><b>sdd checks</b><span>Creates the files, lints them, runs your build and tests, commits and logs. It never calls an AI model.</span></div></div>
     </div>
   </header>
@@ -292,8 +303,8 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <p class="prose">Quipu is a command-line tool, <code>sdd</code>, that runs next to the coding agent you already use. Every change to your project starts as a <strong>feature</strong>: a written spec of what it must do, a technical design, a plan split into small tasks, and only then code. Each phase ends at a gate that only a person can open.</p>
     </div>
     <div class="principles">
-      <div class="principle"><h3>Uses your subscription</h3><p>The reasoning comes from Claude Code, under your own plan. <code>sdd</code> is deterministic and works offline.</p></div>
-      <div class="principle"><h3>Humans hold the gates</h3><p>Approvals are not available to the agent. Its permission rules and a hook deny them, even inside wrappers like <code>bash -c</code>, and <code>sdd</code> rejects them when they come from the agent. You approve with <code>! sdd approve G1</code>.</p></div>
+      <div class="principle"><h3>Uses your subscription</h3><p>The reasoning comes from <span class="ag">Claude Code</span>, under your own plan. <code>sdd</code> is deterministic and works offline.</p></div>
+      <div class="principle"><h3>Humans hold the gates</h3><p>Approvals are not available to the agent. Its permission rules and a hook deny them, even inside wrappers like <code>bash -c</code>, and <code>sdd</code> rejects them when they come from the agent. You approve in your terminal (<code>sdd approve G1</code>)<span data-only="claude">, or with <code>! sdd approve G1</code> inside <span class="ag">Claude Code</span></span>.</p></div>
       <div class="principle"><h3>Every line is traceable</h3><p>Requirement → design → task → commit → test. <code>sdd trace FR-001</code> shows the whole chain.</p></div>
     </div>
   </section>
@@ -358,7 +369,8 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     <div class="head">
       <div class="eyebrow">Set up · once</div>
       <h2>Install, initialize, connect</h2>
-      <p class="prose">You need Go 1.25, git and Claude Code. Install the binary once per machine; set up each project with <code>sdd init</code>. It only creates missing files and never changes one you already have.</p>
+      <p class="prose">You need Go 1.25, git and a coding agent: Claude Code, Codex CLI or Antigravity CLI. Pick yours and the manual adapts its commands. Install the binary once per machine; set up each project with <code>sdd init</code>. It only creates missing files and never changes one you already have.</p>
+      <div class="agent-pick" role="group" aria-label="Your agent"><button type="button" data-agent="claude" aria-pressed="true">Claude Code</button><button type="button" data-agent="codex" aria-pressed="false">Codex CLI</button><button type="button" data-agent="antigravity" aria-pressed="false">Antigravity CLI</button></div>
     </div>
     <div class="setup">
       <div class="card">
@@ -374,18 +386,27 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
         <span class="stepno">B · per project</span>
         <h3>Initialize the project</h3>
         <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>cd my-project
-<span class="p">$ </span>sdd init --agent claude
+<span class="p">$ </span>sdd init --agent <span class="ag-id">claude</span>
 <span class="p">$ </span>git add -A
 <span class="p">$ </span>git commit -m "Set up sdd"</pre></div>
-        <p>Adds <code>sdd.yaml</code>, templates, the <code>/sdd-*</code> commands, the MCP server, the permission rules and the hook that keeps approvals yours. The repository needs at least one commit before implementing.</p>
+        <p>Adds <code>sdd.yaml</code>, templates and your agent's files: the <code><span class="sk">/</span>sdd-*</code> skills, the MCP server and the hook that keeps approvals yours. Set up several agents with a comma-separated list (<code>--agent claude,codex</code>). The repository needs at least one commit before implementing.</p>
       </div>
       <div class="card">
         <span class="stepno">C · per project</span>
-        <h3>Open Claude Code</h3>
-        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>claude
+        <h3>Open <span class="ag">Claude Code</span></h3>
+        <div data-only="claude"><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>claude
 <span class="c"># approve the "sdd" MCP server</span>
 <span class="p">&gt; </span>/mcp</pre></div>
-        <p>Claude Code asks once to approve the <code>sdd</code> server. <code>/mcp</code> should list it as connected, and typing <code>/</code> shows the <code>/sdd-*</code> commands.</p>
+        <p><span class="ag">Claude Code</span> asks once to approve the <code>sdd</code> server. <code>/mcp</code> should list it as connected, and typing <code>/</code> shows the <code><span class="sk">/</span>sdd-*</code> skills. Run <code>sdd</code> commands in a terminal, or with <code>!</code> inside <span class="ag">Claude Code</span>.</p></div>
+        <div data-only="codex"><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>codex
+<span class="c"># trust the project when asked</span>
+<span class="p">&gt; </span>/mcp
+<span class="p">&gt; </span>/hooks</pre></div>
+        <p>Codex reads <code>.codex/</code> only in trusted projects. <code>/mcp</code> lists the <code>sdd</code> server, <code>/hooks</code> lets you review and trust the hook that keeps approvals yours, and typing <code>$</code> shows the <code>$sdd-*</code> skills. Run <code>sdd</code> commands in a separate terminal.</p><p class="note">Set up from its documentation; not yet tested end to end. Tell us how it goes.</p></div>
+        <div data-only="antigravity"><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>agy
+<span class="c"># trust the folder when asked</span>
+<span class="p">&gt; </span>/mcp</pre></div>
+        <p><code>/mcp</code> lists the <code>sdd</code> server, and typing <code>/</code> shows the <code><span class="sk">/</span>sdd-*</code> skills (run <code>/skills reload</code> if they are missing). Run <code>sdd</code> commands in a separate terminal.</p><p class="note">Set up from its documentation; not yet tested end to end. Tell us how it goes.</p></div>
       </div>
     </div>
   </section>
@@ -397,7 +418,8 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     <div class="head">
       <div class="eyebrow">Your first feature</div>
       <h2>From an idea to validated code</h2>
-      <p class="prose">Keep two windows open: Claude Code, where the agent works, and a terminal, where you approve. Replace <code>&lt;f&gt;</code> with the feature name <code>sdd</code> gives you; <code>sdd status</code> lists them.</p>
+      <p class="prose">Keep two windows open: <span class="ag">Claude Code</span>, where the agent works, and a terminal, where you approve. Replace <code>&lt;f&gt;</code> with the feature name <code>sdd</code> gives you; <code>sdd status</code> lists them.</p>
+      <div class="agent-pick" role="group" aria-label="Your agent"><button type="button" data-agent="claude" aria-pressed="true">Claude Code</button><button type="button" data-agent="codex" aria-pressed="false">Codex CLI</button><button type="button" data-agent="antigravity" aria-pressed="false">Antigravity CLI</button></div>
     </div>
 
     <div class="steps">
@@ -407,7 +429,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <h3>Describe what you want</h3>
           <p>The agent creates the feature, asks you questions and writes the functional spec: requirements (<code>FR-001</code>), non-functional requirements (<code>NFR-001</code>) and testable acceptance criteria (<code>AC-001</code>). <code>sdd</code> turns your description into a short, safe feature name.</p>
           <div class="pair">
-            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-spec A to-do list CLI: add, list and complete tasks stored in a JSON file</pre></div></div>
+            <div><span class="tag agent">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-spec A to-do list CLI: add, list and complete tasks stored in a JSON file</pre></div></div>
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd status
 <span class="p">$ </span>sdd spec lint &lt;f&gt;
 <span class="p">$ </span>sdd spec approve &lt;f&gt; --functional</pre></div></div>
@@ -421,10 +443,10 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <h3>Agree on the design</h3>
           <p>The technical spec records the architecture, decisions (<code>ADR-001</code>), which component covers each requirement, and the build, lint and test commands <code>sdd</code> will run to verify the code.</p>
           <div class="pair">
-            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-tech &lt;f&gt;</pre></div></div>
+            <div><span class="tag agent">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-tech &lt;f&gt;</pre></div></div>
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd spec approve &lt;f&gt; --technical</pre></div></div>
           </div>
-          <span class="check">Check that the verification commands are real, e.g. <code>go build ./...</code> and <code>go test ./...</code>.</span>
+          <span class="check"><span>Check that the verification commands are real, e.g. <code>go build ./...</code> and <code>go test ./...</code>.</span></span>
         </div>
       </div>
 
@@ -434,7 +456,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <h3>Approve the plan</h3>
           <p>The plan splits the work into groups (<code>G1</code>, <code>G2</code>…) of small tasks (<code>T1.1</code>…), each touching a few files. <code>sdd sync check</code> fails if any requirement or criterion is left uncovered.</p>
           <div class="pair">
-            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-plan &lt;f&gt;</pre></div></div>
+            <div><span class="tag agent">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-plan &lt;f&gt;</pre></div></div>
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd sync check &lt;f&gt;
 <span class="p">$ </span>sdd plan approve &lt;f&gt;</pre></div></div>
           </div>
@@ -448,7 +470,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <p>You start the implementation; <code>sdd</code> creates an isolated worktree on branch <code>sdd/&lt;f&gt;</code>. The agent works through the group and stops when it is ready for your review. Approve it to continue, or send it back with feedback.</p>
           <div class="pair">
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
-              <span class="tag agent" style="margin-top:14px">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-implement &lt;f&gt;</pre></div></div>
+              <span class="tag agent" style="margin-top:14px">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-implement &lt;f&gt;</pre></div></div>
             <div><span class="tag you">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># --diff for the full diff</span>
 <span class="p">$ </span>sdd approve G1
 <span class="c"># or send it back:</span>
@@ -467,9 +489,9 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
               <span class="chip sdd">one commit with SDD trailers</span><span class="arrow">→</span>
               <span class="chip you">sdd review</span><span class="arrow">→</span>
               <span class="chip you">approve</span><span class="arrow">or</span><span class="chip you">revise</span><span class="arrow">→</span>
-              <span class="chip agent">/sdd-implement</span>
+              <span class="chip agent"><span class="sk">/</span>sdd-implement</span>
             </div>
-            <p class="note">If a check fails, the agent gets the failing output and fixes it, up to <code>limits.max_fix_attempts</code> times (3 by default). Run <code>/sdd-implement &lt;f&gt;</code> again after each approval until every group is done. Inside Claude Code, run the <code>sdd</code> commands with a leading <code>!</code> (<code>! sdd approve G1</code>); <code>/sdd-implement</code> is a slash command and takes no <code>!</code>.</p>
+            <p class="note">If a check fails, the agent gets the failing output and fixes it, up to <code>limits.max_fix_attempts</code> times (3 by default). Run <code><span class="sk">/</span>sdd-implement &lt;f&gt;</code> again after each approval until every group is done.<span data-only="claude"> Inside <span class="ag">Claude Code</span>, run the <code>sdd</code> commands with a leading <code>!</code> (<code>! sdd approve G1</code>); <code><span class="sk">/</span>sdd-implement</code> is a slash command and takes no <code>!</code>.</span></p>
           </div>
         </div>
       </div>
@@ -483,9 +505,9 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd validate &lt;f&gt;
 <span class="p">$ </span>sdd trace --matrix &lt;f&gt;
 <span class="p">$ </span>sdd merge &lt;f&gt;</pre></div></div>
-            <div><span class="tag agent">in Claude Code · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-deep-review &lt;f&gt;</pre></div></div>
+            <div><span class="tag agent">in <span class="ag">Claude Code</span> · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-deep-review &lt;f&gt;</pre></div></div>
           </div>
-          <span class="check"><code>sdd merge</code> merges branch <code>sdd/&lt;f&gt;</code> into the branch checked out in your project, from any directory, removes the worktree and commits the feature's records. Prefer a pull request? Merge it your way, then run <code>sdd merge &lt;f&gt;</code> anyway: it sees the work is already there and only records it.</span>
+          <span class="check"><span><code>sdd merge</code> merges branch <code>sdd/&lt;f&gt;</code> into the branch checked out in your project, from any directory, removes the worktree and commits the feature's records. Prefer a pull request? Merge it your way, then run <code>sdd merge &lt;f&gt;</code> anyway: it sees the work is already there and only records it.</span></span>
         </div>
       </div>
     </div>
@@ -502,9 +524,9 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
         <p class="prose">For a project that already has code, start by documenting it. <code>sdd adopt</code> builds a short inventory (languages, build files, likely commands, tests), and the agent writes <strong>baseline</strong> specs from it. Your code is not touched. Baseline features have no plan; new work then starts as normal features on top of them.</p>
       </div>
       <div class="pair" style="grid-template-columns:minmax(0,1fr)">
-        <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-adopt
+        <div><span class="tag agent">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-adopt
 <span class="c"># or one area at a time:</span>
-<span class="p">&gt; </span>/sdd-adopt billing</pre></div></div>
+<span class="p">&gt; </span><span class="sk">/</span>sdd-adopt billing</pre></div></div>
         <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd spec approve &lt;f&gt; --functional</pre></div></div>
       </div>
     </div>
@@ -551,13 +573,13 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <table>
         <thead><tr><th>Command</th><th>Who</th><th>What it does</th></tr></thead>
         <tbody>
-          <tr><td><code>sdd init --agent claude</code></td><td class="who"><span class="tag you">you</span></td><td>Set up the project for Claude Code. <code>--check</code> lists what is missing.</td></tr>
+          <tr><td><code>sdd init --agent <span class="ag-id">claude</span></code></td><td class="who"><span class="tag you">you</span></td><td>Set up the project for <span class="ag">Claude Code</span> (<code>claude</code>, <code>codex</code>, <code>antigravity</code> or <code>generic</code>). <code>--check</code> lists what is missing.</td></tr>
           <tr><td><code>sdd status [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Phase of each feature and the next action.</td></tr>
-          <tr><td><code>/sdd-spec</code> · <code>/sdd-tech</code> · <code>/sdd-plan</code></td><td class="who"><span class="tag agent">agent</span></td><td>Draft the functional spec, the technical spec, the plan.</td></tr>
+          <tr><td><code><span class="sk">/</span>sdd-spec</code> · <code><span class="sk">/</span>sdd-tech</code> · <code><span class="sk">/</span>sdd-plan</code></td><td class="who"><span class="tag agent">agent</span></td><td>Draft the functional spec, the technical spec, the plan.</td></tr>
           <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content and commit the feature's records.</td></tr>
           <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan.</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Create the worktree and start the first group.</td></tr>
-          <tr><td><code>/sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
+          <tr><td><code><span class="sk">/</span>sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
           <tr><td><code>sdd review G1 [--diff]</code></td><td class="who"><span class="tag you">you</span></td><td>Summary of the group waiting for review. Takes the group ID, a feature, or nothing when one feature is being implemented.</td></tr>
           <tr><td><code>sdd approve G1</code> · <code>sdd revise G1 -m "…"</code></td><td class="who"><span class="tag you">you</span></td><td>Accept the group, or send it back with feedback.</td></tr>
           <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Integration tests, all checks, <code>report.md</code>.</td></tr>
@@ -565,7 +587,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <tr><td><code>sdd sync check [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Consistency between specs, plan and code.</td></tr>
           <tr><td><code>sdd trace &lt;ID&gt;</code> · <code>--matrix &lt;f&gt;</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Follow one ID, or print the full traceability matrix.</td></tr>
           <tr><td><code>sdd feature describe &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Change a feature's title or description.</td></tr>
-          <tr><td><code>/sdd-adopt</code> · <code>/sdd-deep-review</code></td><td class="who"><span class="tag agent">agent</span></td><td>Document existing code; review code against the criteria.</td></tr>
+          <tr><td><code><span class="sk">/</span>sdd-adopt</code> · <code><span class="sk">/</span>sdd-deep-review</code></td><td class="who"><span class="tag agent">agent</span></td><td>Document existing code; review code against the criteria.</td></tr>
           <tr><td><code>sdd resume &lt;f&gt;</code> · <code>sdd clean &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Repair after an interruption; remove the worktree (the branch is kept).</td></tr>
         </tbody>
       </table>
@@ -582,10 +604,10 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     </div>
     <div class="faq">
       <div><h3>I don't know where I am</h3><p>Run <code>sdd status &lt;f&gt;</code>. It shows the phase, the state of every document and the exact next command.</p></div>
-      <div><h3>Claude Code closed in the middle of a task</h3><p>Run <code>sdd resume &lt;f&gt;</code> in your terminal, then <code>/sdd-implement &lt;f&gt;</code> again. The journal knows which step was running.</p></div>
+      <div><h3><span class="ag">Claude Code</span> closed in the middle of a task</h3><p>Run <code>sdd resume &lt;f&gt;</code> in your terminal, then <code><span class="sk">/</span>sdd-implement &lt;f&gt;</code> again. The journal knows which step was running.</p></div>
       <div><h3>I edited a spec after approving it</h3><p>The approval no longer matches. <code>sdd sync check</code> shows what is stale; review the change and approve it again.</p></div>
       <div><h3>The agent says it cannot approve</h3><p>That is by design. Run the approval yourself in a terminal.</p></div>
-      <div><h3>The MCP tools don't show up</h3><p>Check that <code>which sdd</code> finds the binary, then restart Claude Code in the project folder and approve the server.</p></div>
+      <div><h3>The MCP tools don't show up</h3><p>Check that <code>which sdd</code> finds the binary, then restart <span class="ag">Claude Code</span> in the project folder and approve the server.</p></div>
       <div><h3>A group keeps failing its checks</h3><p>After the fix attempts run out, the group is marked failed and the agent stops. Check <code>sdd status &lt;f&gt;</code>, then send guidance with <code>sdd revise G1 -m "…"</code> (the failed group).</p></div>
     </div>
   </section>
@@ -645,6 +667,25 @@ function select(el) {
   var r = document.createRange(); r.selectNodeContents(el);
   var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
 }
+
+(function () {
+  var names = { claude: 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' };
+  var buttons = Array.prototype.slice.call(document.querySelectorAll('.agent-pick button'));
+  function each(sel, fn) { Array.prototype.forEach.call(document.querySelectorAll(sel), fn); }
+  function set(agent) {
+    if (!names[agent]) agent = 'claude';
+    document.documentElement.setAttribute('data-agent', agent);
+    each('.ag', function (e) { e.textContent = names[agent]; });
+    each('.ag-id', function (e) { e.textContent = agent; });
+    each('.sk', function (e) { e.textContent = agent === 'codex' ? '$' : '/'; });
+    buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-agent') === agent ? 'true' : 'false'); });
+    try { localStorage.setItem('quipu-agent', agent); } catch (e) {}
+  }
+  buttons.forEach(function (b) { b.addEventListener('click', function () { set(b.getAttribute('data-agent')); }); });
+  var saved = null;
+  try { saved = localStorage.getItem('quipu-agent'); } catch (e) {}
+  set(saved);
+})();
 </script>
 </body>
 </html>
