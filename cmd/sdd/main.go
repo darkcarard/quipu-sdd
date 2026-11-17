@@ -21,7 +21,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "sdd:", err)
 		os.Exit(cli.ExitError)
 	}
-	app := &cli.App{Dir: dir, Stdout: os.Stdout, Stderr: os.Stderr}
+	app := &cli.App{Dir: dir, Stdin: os.Stdin, Stdout: os.Stdout, Stderr: os.Stderr}
 	code := app.Run(ctx, os.Args[1:])
 	stop()
 	os.Exit(code)

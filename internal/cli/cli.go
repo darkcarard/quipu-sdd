@@ -33,7 +33,8 @@ const (
 
 // App holds the I/O and working directory for a CLI invocation.
 type App struct {
-	Dir    string // working directory; commands find the project root at or above it
+	Dir    string    // working directory; commands find the project root at or above it
+	Stdin  io.Reader // nil: no input
 	Stdout io.Writer
 	Stderr io.Writer
 
@@ -57,6 +58,7 @@ func (a *App) commands() []command {
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
 		{name: "guide", summary: "Print the drafting instructions and template for a topic", run: (*App).runGuide},
 		{name: "mcp", summary: "Serve sdd to a coding agent over MCP (stdio)", run: (*App).runMCP},
+		{name: "hook", summary: "Agent hook: block human-only commands (installed by sdd init --agent claude)", run: (*App).runHook},
 		{name: "adopt", summary: "Inventory an existing project to document it as baseline specs", run: (*App).runAdopt},
 		{name: "feature", summary: "Show or change a feature's title and description", run: (*App).runFeature},
 		{name: "spec", summary: "Create, lint and approve specs", run: (*App).runSpec},

@@ -101,8 +101,10 @@ git status                      # specs/ and .sdd/features/ are clean
 Optional: `/sdd-deep-review <feature>` in Claude Code.
 
 ## 8. Safety checks
-- **Ask Claude** to run `sdd spec approve <feature> --functional`. The `deny` rule in `.claude/settings.json` must block it. Through MCP, the core also rejects it (`ErrHumanOnly`).
-- **Type `! sdd plan approve <feature>`** yourself inside Claude Code. This is unverified: whether `deny` rules apply to `!` bash mode. Record what happens.
+- **Ask Claude** to run, one by one, harmless forms of a human-only command (with nothing under review they only print an sdd error): `sdd approve G9`, `sdd merge`, `cd . && sdd approve G9`, `X=1 sdd approve G9`, `~/go/bin/sdd approve G9`, `bash -c "sdd approve G9"`. Every one must be denied. Claude may refuse on its own first (its instructions forbid approvals); tell it this is a permission test. Through MCP, the core also rejects approvals (`ErrHumanOnly`).
+  - First run (Claude Code 2.1.326, deny rules only): the first five were denied by the rules; `bash -c "sdd approve G9"` ran. The `PreToolUse` hook (`sdd hook pre-tool-use`) was added for that case: rerun the list and check that the sixth is now denied by the hook.
+- **Type `! sdd approve G9`** yourself inside Claude Code: it must run (an sdd error, not a permission denial), since hooks do not apply to `!`.
+  - Verified in the first run: `!` commands share the agent's shell environment (`CLAUDECODE=1`, the same `AI_AGENT`) and have no TTY, so `sdd` cannot tell them apart from the agent's by itself.
 - **Interruption:** quit Claude Code in the middle of a task, run `sdd resume <feature>`, then continue with `/sdd-implement`.
 
 ## Brownfield variant

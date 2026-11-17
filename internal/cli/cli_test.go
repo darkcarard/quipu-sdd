@@ -135,13 +135,16 @@ func TestInitAgentClaude(t *testing.T) {
 	if err := json.Unmarshal(b, &settings); err != nil {
 		t.Fatal(err)
 	}
-	for _, rule := range []string{"Bash(sdd spec approve *)", "Bash(sdd plan approve *)", "Bash(sdd approve *)", "Bash(sdd revise *)", "Bash(sdd resume *)", "Bash(sdd clean *)"} {
+	for _, rule := range []string{"Bash(sdd spec approve *)", "Bash(sdd plan approve *)", "Bash(sdd approve *)", "Bash(sdd revise *)", "Bash(sdd resume *)", "Bash(sdd clean *)", "Bash(sdd merge *)"} {
 		if !slices.Contains(settings.Permissions.Deny, rule) {
 			t.Errorf("deny rules miss %s: %v", rule, settings.Permissions.Deny)
 		}
 	}
 	if !slices.Contains(settings.Permissions.Allow, "mcp__sdd__*") {
 		t.Errorf("allow = %v", settings.Permissions.Allow)
+	}
+	if !strings.Contains(string(b), `"command": "sdd hook pre-tool-use"`) || !strings.Contains(string(b), `"matcher": "Bash"`) {
+		t.Errorf("settings.json has no PreToolUse hook:\n%s", b)
 	}
 	skill, _ := os.ReadFile(filepath.Join(dir, ".claude", "skills", "sdd-spec", "SKILL.md"))
 	if !strings.Contains(string(skill), "description:") || !strings.Contains(string(skill), "$ARGUMENTS") {
@@ -231,5 +234,20 @@ func TestVersionHelpAndUnknown(t *testing.T) {
 	}
 	if code, _, _ := run(t, dir, "init", "extra"); code != ExitUsage {
 		t.Fatalf("init with extra args should be a usage error, got %d", code)
+	}
+}
+
+func TestHookBlocksHumanOnlyCommands(t *testing.T) {
+	hook := func(input string) (int, string) {
+		var out, errOut bytes.Buffer
+		a := &App{Dir: t.TempDir(), Stdin: strings.NewReader(input), Stdout: &out, Stderr: &errOut}
+		return a.Run(context.Background(), []string{"hook", "pre-tool-use"}), out.String()
+	}
+	code, out := hook(`{"tool_name":"Bash","tool_input":{"command":"bash -c \"sdd approve G2\""}}`)
+	if code != ExitOK || !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(out, "`sdd approve`") {
+		t.Errorf("wrapped approve: %d %s", code, out)
+	}
+	if code, out := hook(`{"tool_name":"Bash","tool_input":{"command":"sdd status"}}`); code != ExitOK || out != "" {
+		t.Errorf("sdd status must pass: %d %q", code, out)
 	}
 }

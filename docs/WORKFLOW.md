@@ -24,7 +24,7 @@ The LLM work is done by the **host agent** the user already runs (Claude Code fi
 | **`sdd`** | Creates artifacts from templates, lints, checks sync and coverage, hands each task to the agent, verifies, commits, journals | Its own code, deterministically |
 | **User** | Answers the agent, approves specs and the plan, reviews each group | The `sdd` CLI in their terminal (in Claude Code, `! sdd …` also works) |
 
-Approval and review commands are human-only: they are not exposed as MCP tools, and the permission rules installed by `sdd init --agent` deny them to the agent.
+Approval and review commands are human-only: they are not exposed as MCP tools, and the permission rules and hook installed by `sdd init --agent claude` deny them to the agent.
 
 ### Agent setup
 
@@ -33,7 +33,10 @@ Approval and review commands are human-only: they are not exposed as MCP tools, 
 `sdd init --agent claude` sets up Claude Code:
 - `.mcp.json`: registers `sdd mcp` (stdio) as the `sdd` MCP server. Claude Code asks once to approve a project's MCP servers.
 - `.claude/skills/sdd-*/SKILL.md`: the `/sdd-*` commands below (Claude Code skills). Each one carries its own instructions, and the MCP server sends the workflow rules to the agent when it connects, so no change to `CLAUDE.md` is needed.
-- `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`) and `deny` rules for the approval and review commands (`Bash(sdd spec approve *)` and the like). Deny rules take precedence over any allow rule. They match the command as typed, so they are a guard against mistakes, not a sandbox; the approvals' git identity and the journal record who approved.
+- `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`) and `deny` rules for the approval and review commands (`Bash(sdd spec approve *)` and the like). Deny rules take precedence over any allow rule. They match the command as typed, so a wrapper such as `bash -c "sdd approve G2"` gets past them.
+- `.claude/settings.json` also installs a `PreToolUse` hook on the Bash tool, `sdd hook pre-tool-use`, which denies any command that contains a human-only `sdd` command anywhere (`bash -c`, `env`, `xargs`, `$(…)`, a path to the binary). Hooks run on the agent's tool calls only, not on the commands you type with `!`, so you keep approving with `! sdd approve G2`. `sdd` cannot tell you apart from the agent by itself: inside Claude Code both shells carry `CLAUDECODE=1` and the same `AI_AGENT`, and neither has a terminal.
+
+Together they guard against mistakes and well-meant shortcuts, not against an agent set on getting around them (it could edit `state.json`); the approvals' git identity and the journal record who approved.
 
 `sdd init --agent generic` writes an `AGENTS.md` that explains the workflow to any agent that reads it, if the project has none. Integration files for more agents arrive in M8.
 

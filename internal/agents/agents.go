@@ -92,13 +92,24 @@ func claudeFiles() ([]File, error) {
 	}
 	allow := []string{"mcp__sdd__*"}
 	perms := map[string]any{"allow": allow, "deny": deny}
+	// The hook catches what the deny rules cannot: the same commands inside
+	// wrappers such as bash -c. It runs on the agent's calls, not on `!`.
+	hook := map[string]any{"matcher": "Bash", "hooks": []any{map[string]any{"type": "command", "command": HookCommand}}}
+	hooks := map[string]any{"PreToolUse": []any{hook}}
 	out = append(out, File{
-		Path: ".claude/settings.json", Content: mustJSON(map[string]any{"permissions": perms}),
+		Path: ".claude/settings.json", Content: mustJSON(map[string]any{"permissions": perms, "hooks": hooks}),
 		satisfied: func(b []byte) bool {
 			var m struct {
 				Permissions struct {
 					Deny []string `json:"deny"`
 				} `json:"permissions"`
+				Hooks struct {
+					PreToolUse []struct {
+						Hooks []struct {
+							Command string `json:"command"`
+						} `json:"hooks"`
+					} `json:"PreToolUse"`
+				} `json:"hooks"`
 			}
 			if json.Unmarshal(b, &m) != nil {
 				return false
@@ -108,10 +119,18 @@ func claudeFiles() ([]File, error) {
 					return false
 				}
 			}
-			return true
+			for _, h := range m.Hooks.PreToolUse {
+				for _, c := range h.Hooks {
+					if c.Command == HookCommand {
+						return true
+					}
+				}
+			}
+			return false
 		},
 		Snippet: "Add these rules under \"permissions\" (the deny rules keep approvals human-only):\n  \"allow\": " +
-			string(mustJSON(allow)) + ",\n  \"deny\": " + string(mustJSON(deny)),
+			string(mustJSON(allow)) + ",\n  \"deny\": " + strings.TrimSpace(string(mustJSON(deny))) +
+			"\nand this hook under \"hooks\" (it also blocks those commands inside wrappers such as bash -c):\n  \"PreToolUse\": [" + strings.TrimSpace(string(mustJSON(hook))) + "]",
 	})
 	return out, nil
 }

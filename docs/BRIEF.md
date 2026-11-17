@@ -85,7 +85,7 @@ Agent-facing output is kept compact on purpose, because it is read by the agent 
 ### Security and Enforcement
 `sdd` cannot sandbox the host agent: file access, shell access and network access are governed by the agent's own permission system. What `sdd` guarantees deterministically:
 * A gate only opens when its checks pass: lint and sync for approvals, build and tests for task and group completion.
-* Approvals and review decisions are human-only, and so are `sdd resume` and `sdd clean`, which can discard work. They are not MCP tools, the installed permission rules deny the agent the matching shell commands, and the core rejects them when the caller is an agent. Every approval records the git identity of the approver.
+* Approvals and review decisions are human-only, and so are `sdd resume` and `sdd clean`, which can discard work. They are not MCP tools, the installed permission rules and hook deny the agent the matching shell commands (also inside wrappers such as `bash -c`), and the core rejects them when an agent calls through MCP. Every approval records the git identity of the approver.
 * Commits on `sdd/<feature>` are made by `sdd`, with trailers. Changes outside the current task's declared files are reported at task completion and in the group review.
 * `sdd` never pushes and never merges into the user's branch.
 

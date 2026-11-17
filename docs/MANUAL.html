@@ -293,7 +293,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     </div>
     <div class="principles">
       <div class="principle"><h3>Uses your subscription</h3><p>The reasoning comes from Claude Code, under your own plan. <code>sdd</code> is deterministic and works offline.</p></div>
-      <div class="principle"><h3>Humans hold the gates</h3><p>Approvals are not available to the agent. Its permission rules deny them, and <code>sdd</code> rejects them when they come from the agent.</p></div>
+      <div class="principle"><h3>Humans hold the gates</h3><p>Approvals are not available to the agent. Its permission rules and a hook deny them, even inside wrappers like <code>bash -c</code>, and <code>sdd</code> rejects them when they come from the agent. You approve with <code>! sdd approve G1</code>.</p></div>
       <div class="principle"><h3>Every line is traceable</h3><p>Requirement → design → task → commit → test. <code>sdd trace FR-001</code> shows the whole chain.</p></div>
     </div>
   </section>
@@ -377,7 +377,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 <span class="p">$ </span>sdd init --agent claude
 <span class="p">$ </span>git add -A
 <span class="p">$ </span>git commit -m "Set up sdd"</pre></div>
-        <p>Adds <code>sdd.yaml</code>, templates, the <code>/sdd-*</code> commands, the MCP server and the permission rules. The repository needs at least one commit before implementing.</p>
+        <p>Adds <code>sdd.yaml</code>, templates, the <code>/sdd-*</code> commands, the MCP server, the permission rules and the hook that keeps approvals yours. The repository needs at least one commit before implementing.</p>
       </div>
       <div class="card">
         <span class="stepno">C · per project</span>

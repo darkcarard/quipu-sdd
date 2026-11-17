@@ -293,7 +293,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     </div>
     <div class="principles">
       <div class="principle"><h3>Usa tu suscripción</h3><p>El razonamiento lo pone Claude Code, con tu propio plan. <code>sdd</code> es determinista y funciona sin conexión.</p></div>
-      <div class="principle"><h3>Las personas aprueban</h3><p>El agente no puede aprobar. Sus reglas de permisos se lo impiden, y <code>sdd</code> rechaza las aprobaciones que vienen del agente.</p></div>
+      <div class="principle"><h3>Las personas aprueban</h3><p>El agente no puede aprobar. Sus reglas de permisos y un hook se lo impiden, incluso dentro de envoltorios como <code>bash -c</code>, y <code>sdd</code> rechaza las aprobaciones que vienen del agente. Tú apruebas con <code>! sdd approve G1</code>.</p></div>
       <div class="principle"><h3>Todo es trazable</h3><p>Requisito → diseño → tarea → commit → prueba. <code>sdd trace FR-001</code> muestra la cadena completa.</p></div>
     </div>
   </section>
@@ -375,7 +375,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 <span class="p">$ </span>sdd init --agent claude
 <span class="p">$ </span>git add -A
 <span class="p">$ </span>git commit -m "Set up sdd"</pre></div>
-        <p>Agrega <code>sdd.yaml</code>, las plantillas, los comandos <code>/sdd-*</code>, el servidor MCP y las reglas de permisos. El repositorio necesita al menos un commit antes de implementar.</p>
+        <p>Agrega <code>sdd.yaml</code>, las plantillas, los comandos <code>/sdd-*</code>, el servidor MCP, las reglas de permisos y el hook que reserva las aprobaciones para ti. El repositorio necesita al menos un commit antes de implementar.</p>
       </div>
       <div class="card">
         <span class="stepno">C · por proyecto</span>

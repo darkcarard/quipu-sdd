@@ -4,7 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 
+	"github.com/darkcarard/quipu-sdd/internal/agents"
 	"github.com/darkcarard/quipu-sdd/internal/app"
 )
 
@@ -262,4 +264,23 @@ func (a *App) runValidate(ctx context.Context, args []string) error {
 		return errFailed
 	}
 	return nil
+}
+
+// runHook answers a Claude Code PreToolUse hook: a Bash call that runs a
+// human-only command, even inside a wrapper, is denied. It needs no project.
+func (a *App) runHook(_ context.Context, args []string) error {
+	if len(args) != 1 || args[0] != "pre-tool-use" {
+		return a.usageErr("sdd hook pre-tool-use   (reads the hook's JSON on stdin)")
+	}
+	if a.Stdin == nil {
+		return nil
+	}
+	in, err := io.ReadAll(io.LimitReader(a.Stdin, 1<<20))
+	if err != nil {
+		return err
+	}
+	if reason := agents.Guard(in); reason != "" {
+		_, err = a.Stdout.Write(agents.HookResponse(reason))
+	}
+	return err
 }
