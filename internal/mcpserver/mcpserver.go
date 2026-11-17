@@ -19,7 +19,7 @@ import (
 const Name = "sdd"
 
 // Tools lists the tool names, in registration order.
-var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace", "task_next", "task_done", "group_verify"}
+var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace", "task_next", "task_done", "group_verify", "review_context"}
 
 // Run serves the project over stdin/stdout until ctx is cancelled or the client disconnects.
 func Run(ctx context.Context, a *app.App) error {
@@ -90,10 +90,10 @@ func New(a *app.App) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "sync_check",
 		Description: "Check consistency between a feature's artifacts (or every feature's): the technical spec maps every requirement and criterion, " +
-			"the plan covers them, recorded hashes match, and nothing was edited after approval.",
+			"the plan covers them, recorded hashes match, nothing was edited after approval, and (once implemented) each group has one commit and every criterion a test.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in featureArg) (*mcp.CallToolResult, any, error) {
-		r, err := a.Sync(in.Feature)
+		r, err := a.Sync(ctx, in.Feature)
 		return text(app.FormatSync(r), err)
 	})
 
@@ -104,9 +104,9 @@ func New(a *app.App) *mcp.Server {
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in traceArgs) (*mcp.CallToolResult, any, error) {
 		if in.Matrix {
-			return text(a.Matrix(in.ID))
+			return text(a.Matrix(ctx, in.ID))
 		}
-		entries, err := a.Trace(in.ID)
+		entries, err := a.Trace(ctx, in.ID)
 		return text(app.FormatTrace(entries), err)
 	})
 	mcp.AddTool(s, &mcp.Tool{
@@ -141,6 +141,14 @@ func New(a *app.App) *mcp.Server {
 			return failure(app.FormatVerified(v))
 		}
 		return text(app.FormatVerified(v), err)
+	})
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "review_context",
+		Description: "Validation: get the brief for a deep (semantic) review of an implemented feature: every acceptance criterion with its tasks, " +
+			"commits and tests, where the code is, and the format of the review file to write. The review is informational and never blocks a gate.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
+		return text(a.ReviewContext(ctx, in.Feature))
 	})
 	return s
 }

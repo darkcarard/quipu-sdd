@@ -8,6 +8,7 @@ import (
 
 	"github.com/darkcarard/sdd-framework/internal/implement"
 	"github.com/darkcarard/sdd-framework/internal/trace"
+	"github.com/darkcarard/sdd-framework/internal/validate"
 	"github.com/darkcarard/sdd-framework/internal/verify"
 )
 
@@ -373,4 +374,25 @@ func stripFrontmatter(s string) string {
 		return s[4+i+5:]
 	}
 	return s
+}
+
+// FormatValidation renders the result of `sdd validate`.
+func FormatValidation(r validate.Result) string {
+	var sb strings.Builder
+	if r.Skipped {
+		sb.WriteString("integration: skipped (no command)\n")
+	} else {
+		sb.WriteString(verify.Summary(r.Integration))
+	}
+	for _, d := range r.Diagnostics {
+		sb.WriteString(d.String() + "\n")
+	}
+	errs, warns := r.Diagnostics.Count()
+	result := "PASSED"
+	if !r.Passed {
+		result = "FAILED"
+	}
+	fmt.Fprintf(&sb, "\nvalidation %s: %s, %s; report written to %s\n", result, Plural(errs, "error"), Plural(warns, "warning"), r.Report)
+	fmt.Fprintf(&sb, "\nNext: %s\n", r.Next)
+	return sb.String()
 }

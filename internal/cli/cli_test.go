@@ -113,7 +113,7 @@ func TestInitAgentClaude(t *testing.T) {
 	if code != ExitOK {
 		t.Fatal(e)
 	}
-	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md", ".claude/skills/sdd-plan/SKILL.md", ".claude/skills/sdd-implement/SKILL.md"} {
+	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md", ".claude/skills/sdd-plan/SKILL.md", ".claude/skills/sdd-implement/SKILL.md", ".claude/skills/sdd-deep-review/SKILL.md"} {
 		if !strings.Contains(out, "created  "+f) {
 			t.Errorf("%s not created:\n%s", f, out)
 		}
@@ -226,7 +226,7 @@ func TestVersionHelpAndUnknown(t *testing.T) {
 	if code, _, e := run(t, dir, "bogus"); code != ExitUsage || !strings.Contains(e, "unknown command") {
 		t.Fatalf("unknown: %d %q", code, e)
 	}
-	if code, _, e := run(t, dir, "validate", "x"); code != ExitError || !strings.Contains(e, "M6") {
+	if code, _, e := run(t, dir, "upgrade"); code != ExitError || !strings.Contains(e, "later") {
 		t.Fatalf("unimplemented command should name its milestone: %d %q", code, e)
 	}
 	if code, _, _ := run(t, dir, "init", "extra"); code != ExitUsage {

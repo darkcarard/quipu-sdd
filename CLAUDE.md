@@ -17,7 +17,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M3 (agent integration + Specify): done.** `sdd mcp` (stdio, official Go SDK) with `status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check`, `trace`; `sdd guide`; `sdd init --agent claude|generic` and `--check` (never modifies existing files; ephemeral paths in `.sdd/.gitignore`); Claude Code skills `/sdd-spec`, `/sdd-tech`; agents journaled as `agent:<client>` and unable to approve (`feature.ErrHumanOnly`); commands find the project root from any subdirectory.
 - **M4 (Plan): done.** `guide plan` with a coverage checklist built from the approved specs (IDs with their components/test levels, file limit, Architecture, language), `/sdd-plan` skill, plan layer check against the technical Architecture (`plan.CheckLayers`, warning). Next-step texts point to the agent commands and say approvals are the user's.
 - **M5 (Implement): done.** `internal/workspace` (git CLI: worktree ensure/repair, checkpoints, squash with trailers, diff, reset, log), `internal/verify` (technical-spec commands with timeout, process-group kill, output tail), `internal/implement` (group/task state machine: `Start`, `TaskNext`, `TaskDone`, `GroupVerify`, `ReviewGroup`, `ApproveGroup`, `ReviseGroup`, `Resume`, `Clean`). CLI `implement`, `task next|done`, `group verify`, `review`, `approve`, `revise`, `resume`, `clean`; MCP `task_next`, `task_done`, `group_verify`; `/sdd-implement`; `guide implement`. After an approval the agent's `task_next` starts the next group. `FindRoot` maps a worktree to its owning project.
-- **Next: M6.** Validate: `sdd validate`, plan↔code sync (group commits and trailers, `covers: AC-###` in tests), full `trace` with commits and tests, `report.md`, `review_context` and `/sdd-deep-review`. Brownfield adoption is M7.
+- **M6 (Validate): done.** `internal/validate`: `CheckCode` (one commit per group with matching trailers on `sdd/<feature>`, commits without trailers, `covers:` references found with `git grep`, every AC of an approved group tested), `Index` (trace with commits and tests), `Validate` (integration in the worktree, all sync checks, `report.md`, phase `validated`), `ReviewContext`. CLI `validate`, `review --context`; `sync check` and `trace` include code; MCP `review_context`; `/sdd-deep-review`.
+- **Next: M7.** Brownfield adoption (`adopt_context`, baseline features, `/sdd-adopt`). Also pending: a review of how verbose agent-facing outputs are (token cost), and the end-to-end test in a real Claude Code session.
 
 Update this section whenever a milestone is completed.
 
@@ -51,6 +52,7 @@ make install # go install with version ldflags
 - `internal/mcpserver`: `sdd mcp`; human-only operations are never registered as tools
 - `internal/agents`: integration files per agent (`files/claude`, `files/generic`) and the never-overwrite installer
 - `internal/implement`, `internal/workspace`, `internal/verify`: Phase 3 (see M5 above)
+- `internal/validate`: Phase 4 (see M6 above)
 - `internal/config`: configuration (`sdd.yaml` plus `.env` and environment variables)
 - `internal/workflow`: phases, transitions, `Evaluate` (staleness), `Effective` (derived phase)
 - `internal/state`: `Layout` paths, atomic writes, `FeatureState`

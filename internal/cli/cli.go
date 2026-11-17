@@ -68,9 +68,9 @@ func (a *App) commands() []command {
 		{name: "revise", summary: "Send review feedback to the agent for the current group", run: (*App).runRevise},
 		{name: "resume", summary: "Repair state after an interruption", run: (*App).runResume},
 		{name: "clean", summary: "Remove a feature worktree (the branch is kept)", run: (*App).runClean},
-		{name: "validate", summary: "Run integration tests and sync checks, write the report", milestone: "M6"},
-		{name: "sync", summary: "Check consistency between specs and plan (code in M6)", run: (*App).runSync},
-		{name: "trace", summary: "Trace an ID across specs and plan (commits and tests in M6)", run: (*App).runTrace},
+		{name: "validate", summary: "Run integration tests and every sync check, write the report", run: (*App).runValidate},
+		{name: "sync", summary: "Check consistency between specs, plan and code", run: (*App).runSync},
+		{name: "trace", summary: "Trace an ID across specs, plan, commits and tests", run: (*App).runTrace},
 		{name: "upgrade", summary: "Migrate the project layout to this binary's version", milestone: "later"},
 	}
 }

@@ -1,6 +1,7 @@
 // Package trace builds the requirement → technical → plan → commit → test chain
 // used by `sdd trace` and `sdd sync check` (docs/TRACEABILITY.md §1).
-// Spec and plan links are built here; commit and test links arrive in M6.
+// Spec and plan links are built by Build; commit and test links are added by
+// Link once the feature has been implemented.
 package trace
 
 import (
@@ -46,6 +47,12 @@ type Entry struct {
 	Files     []string
 	DependsOn []string
 	Layer     string
+	// Commits are the group commits that implement the ID ("<sha> <subject>").
+	Commits []string
+	// Tests are the test references that cover the ID ("path:line").
+	Tests []string
+
+	linked bool
 }
 
 // Index holds every traced ID of one feature, in document order.
@@ -53,7 +60,27 @@ type Index struct {
 	Feature string
 	entries []Entry
 	byID    map[string]int
+	linked  bool // Link was called: commits and tests are known
 }
+
+// Links are the implementation links of a feature, keyed by spec, group or task ID.
+type Links struct {
+	Commits map[string][]string
+	Tests   map[string][]string
+}
+
+// Link attaches commits and test references to the entries.
+func (ix *Index) Link(l Links) {
+	ix.linked = true
+	for i := range ix.entries {
+		e := &ix.entries[i]
+		e.Commits = l.Commits[e.ID]
+		e.Tests = l.Tests[e.ID]
+	}
+}
+
+// Linked reports whether commits and tests were attached.
+func (ix *Index) Linked() bool { return ix.linked }
 
 // Files locates the feature artifacts, for Location fields.
 type Files struct {
@@ -144,7 +171,9 @@ func (ix *Index) Lookup(id string) (Entry, bool) {
 	if !ok {
 		return Entry{}, false
 	}
-	return ix.entries[i], true
+	e := ix.entries[i]
+	e.linked = ix.linked
+	return e, true
 }
 
 // Entries returns every entry in document order.
@@ -194,8 +223,17 @@ func (e Entry) Render() string {
 	case KindTask:
 		rows = append(rows, row{"covers", list(e.Covers)}, row{"files", list(e.Files)})
 	}
-	if e.Kind == KindRequirement || e.Kind == KindCriterion {
-		rows = append(rows, row{"commits", "(linked in M6)"}, row{"tests", "(linked in M6)"})
+	impl := func(xs []string) string {
+		if !e.linked {
+			return "(not implemented yet)"
+		}
+		return list(xs)
+	}
+	switch e.Kind {
+	case KindRequirement, KindCriterion:
+		rows = append(rows, row{"commits", impl(e.Commits)}, row{"tests", impl(e.Tests)})
+	case KindGroup, KindTask:
+		rows = append(rows, row{"commit", impl(e.Commits)})
 	}
 	for i, r := range rows {
 		branch := "├─"
@@ -212,7 +250,11 @@ func (e Entry) Render() string {
 func (ix *Index) Matrix() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# Traceability matrix: %s\n\n", ix.Feature)
-	sb.WriteString("| ID | Parent | Title | Technical | Plan |\n|---|---|---|---|---|\n")
+	if ix.linked {
+		sb.WriteString("| ID | Parent | Title | Technical | Plan | Commits | Tests |\n|---|---|---|---|---|---|---|\n")
+	} else {
+		sb.WriteString("| ID | Parent | Title | Technical | Plan |\n|---|---|---|---|---|\n")
+	}
 	gap := func(e Entry, xs []string) string {
 		switch {
 		case len(xs) > 0:
@@ -230,9 +272,23 @@ func (ix *Index) Matrix() string {
 		if e.Retired {
 			id = "~~" + id + "~~"
 		}
-		fmt.Fprintf(&sb, "| %s | %s | %s | %s | %s |\n", id, cell(e.Parent), cell(e.Title), gap(e, e.Technical), gap(e, e.Tasks))
+		row := fmt.Sprintf("| %s | %s | %s | %s | %s |", id, cell(e.Parent), cell(e.Title), gap(e, e.Technical), gap(e, e.Tasks))
+		if ix.linked {
+			commits := make([]string, 0, len(e.Commits))
+			for _, c := range e.Commits {
+				commits = append(commits, strings.SplitN(c, " ", 2)[0])
+			}
+			tests := gap(e, e.Tests)
+			if e.Kind != KindCriterion && len(e.Tests) == 0 {
+				tests = "—" // only criteria require tests
+			}
+			row += fmt.Sprintf(" %s | %s |", gap(e, commits), tests)
+		}
+		sb.WriteString(row + "\n")
 	}
-	sb.WriteString("\nCommits and tests are linked from Phase 4 (M6).\n")
+	if !ix.linked {
+		sb.WriteString("\nCommits and tests are linked once the feature is being implemented.\n")
+	}
 	return sb.String()
 }
 

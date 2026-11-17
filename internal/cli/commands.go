@@ -310,7 +310,7 @@ func (a *App) runSync(_ context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	r, err := p.Sync(first(pos))
+	r, err := p.Sync(context.Background(), first(pos))
 	if err != nil {
 		return err
 	}
@@ -339,14 +339,14 @@ func (a *App) runTrace(_ context.Context, args []string) error {
 		return err
 	}
 	if *matrix {
-		m, err := p.Matrix(pos[0])
+		m, err := p.Matrix(context.Background(), pos[0])
 		if err != nil {
 			return err
 		}
 		fmt.Fprint(a.Stdout, m)
 		return nil
 	}
-	entries, err := p.Trace(pos[0])
+	entries, err := p.Trace(context.Background(), pos[0])
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/spec"
 	"github.com/darkcarard/sdd-framework/internal/state"
 	"github.com/darkcarard/sdd-framework/internal/trace"
+	"github.com/darkcarard/sdd-framework/internal/validate"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
@@ -201,9 +202,18 @@ func (a *App) Lint(arg string) (Report, error) {
 	})
 }
 
-// Sync runs the spec↔spec and spec↔plan checks on one feature (arg) or all.
-func (a *App) Sync(arg string) (Report, error) {
-	return a.checkEach(arg, func(f *feature.Feature) (int, diag.List) { return 0, f.Sync() })
+// Sync runs the spec↔spec, spec↔plan and (once implementation has started)
+// plan↔code checks on one feature (arg) or all.
+func (a *App) Sync(ctx context.Context, arg string) (Report, error) {
+	var codeErr error
+	r, err := a.checkEach(arg, func(f *feature.Feature) (int, diag.List) {
+		ds, _, err := validate.CheckCode(ctx, f)
+		if err != nil && codeErr == nil {
+			codeErr = fmt.Errorf("%s: plan↔code: %w", f.Name, err)
+		}
+		return 0, append(f.Sync(), ds...)
+	})
+	return r, errors.Join(err, codeErr)
 }
 
 // Summary is one feature in the project overview.
@@ -520,16 +530,13 @@ func (a *App) Describe(ctx context.Context, arg string, title, desc *string) (De
 	return out, err
 }
 
-func (a *App) index(name string) (*trace.Index, error) {
+func (a *App) index(ctx context.Context, name string) (*trace.Index, error) {
 	f, err := feature.Load(a.Layout, a.Config, name)
 	if err != nil {
 		return nil, err
 	}
-	return trace.Build(name, trace.Files{
-		Functional: f.Files[workflow.Functional].Rel,
-		Technical:  f.Files[workflow.Technical].Rel,
-		Plan:       f.Files[workflow.Plan].Rel,
-	}, f.Functional, f.Technical, f.Plan), nil
+	ix, _, err := validate.Index(ctx, f)
+	return ix, err
 }
 
 // TraceableID reports whether id can be traced (FR, NFR, AC, ADR, G#, T#.#).
@@ -538,7 +545,7 @@ func TraceableID(id string) bool {
 }
 
 // Trace finds an ID ("ID" in every feature, or "<feature>/ID").
-func (a *App) Trace(arg string) ([]trace.Entry, error) {
+func (a *App) Trace(ctx context.Context, arg string) ([]trace.Entry, error) {
 	id := arg
 	var names []string
 	var err error
@@ -556,7 +563,7 @@ func (a *App) Trace(arg string) ([]trace.Entry, error) {
 	}
 	var out []trace.Entry
 	for _, n := range names {
-		ix, err := a.index(n)
+		ix, err := a.index(ctx, n)
 		if err != nil {
 			return nil, err
 		}
@@ -571,12 +578,12 @@ func (a *App) Trace(arg string) ([]trace.Entry, error) {
 }
 
 // Matrix renders the traceability matrix of a feature in markdown.
-func (a *App) Matrix(arg string) (string, error) {
+func (a *App) Matrix(ctx context.Context, arg string) (string, error) {
 	name, err := a.Resolve(arg)
 	if err != nil {
 		return "", err
 	}
-	ix, err := a.index(name)
+	ix, err := a.index(ctx, name)
 	if err != nil {
 		return "", err
 	}

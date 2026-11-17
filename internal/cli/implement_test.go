@@ -82,6 +82,13 @@ func TestImplementWorkflowCLI(t *testing.T) {
 	mustRun(t, dir, ExitOK, "group", "verify", sddtest.Feature)
 	contains(t, mustRun(t, dir, ExitOK, "approve", sddtest.Feature), "approved G1", "start G2")
 
+	// Phase 4 checks already apply to approved groups.
+	contains(t, mustRun(t, dir, ExitError, "sync", "check", sddtest.Feature), "AC-001 is not referenced by any test")
+	contains(t, mustRun(t, dir, ExitOK, "trace", "FR-001"), "feat(user-signup): G1 Domain model", "tests:     (none)")
+	contains(t, mustRun(t, dir, ExitOK, "trace", "--matrix", sddtest.Feature), "| Commits | Tests |")
+	contains(t, mustRun(t, dir, ExitError, "validate", sddtest.Feature), "validation needs every group approved")
+	contains(t, mustRun(t, dir, ExitOK, "review", sddtest.Feature, "--context"), "# Deep review: user-signup", "### AC-001 (FR-001)")
+
 	// Interruption and recovery.
 	contains(t, mustRun(t, dir, ExitOK, "task", "next", sddtest.Feature), "Task T2.1: Register")
 	put("internal/signup/service.go")

@@ -6,6 +6,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/implement"
 	"github.com/darkcarard/sdd-framework/internal/lock"
+	"github.com/darkcarard/sdd-framework/internal/validate"
 )
 
 // implementing runs fn on a fresh session of the feature, under its lock.
@@ -89,4 +90,23 @@ func (a *App) Resume(ctx context.Context, arg string, discard, forceUnlock bool)
 func (a *App) Clean(ctx context.Context, arg string, force bool) (msg string, err error) {
 	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) { msg, e = implement.Clean(ctx, s, force); return })
 	return
+}
+
+// Validate runs the integration tests and every sync check of an implemented
+// feature and writes its report.
+func (a *App) Validate(ctx context.Context, arg string) (out validate.Result, err error) {
+	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) {
+		out, e = validate.Validate(ctx, s.F, s.Who, s.Now, a.Config.Limits.CommandTimeout)
+		return
+	})
+	return
+}
+
+// ReviewContext returns the brief for an agent-assisted deep review.
+func (a *App) ReviewContext(ctx context.Context, arg string) (string, error) {
+	f, err := a.Load(arg)
+	if err != nil {
+		return "", err
+	}
+	return validate.ReviewContext(ctx, f)
 }

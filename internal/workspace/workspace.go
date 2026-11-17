@@ -240,8 +240,13 @@ type Commit struct {
 
 // Log returns the commits reachable from HEAD but not from base, newest first.
 func (w *Worktree) Log(ctx context.Context, base string) ([]Commit, error) {
+	return w.git.Log(ctx, base+"..HEAD")
+}
+
+// Log returns the commits of a revision range (e.g. "base..branch"), newest first.
+func (g Git) Log(ctx context.Context, revRange string) ([]Commit, error) {
 	const sep = "\x1e"
-	out, err := w.git.Run(ctx, "log", "--format=%H%x1f%s%x1f%(trailers:only,unfold)"+sep, base+"..HEAD")
+	out, err := g.Run(ctx, "log", "--format=%H%x1f%s%x1f%(trailers:only,unfold)"+sep, revRange)
 	if err != nil {
 		return nil, err
 	}

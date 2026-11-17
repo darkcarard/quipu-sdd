@@ -134,12 +134,14 @@ Rules **[lint]**:
 
 ## Tests and Traceability
 
-Every test that verifies an acceptance criterion references it, either in its name or in a comment, so that `sdd trace` and `sdd sync check` can find it:
+Every test that verifies an acceptance criterion references it in a comment, so that `sdd trace`, `sdd sync check` and `sdd validate` can find it:
 
 ```go
 // covers: AC-003
 func TestSignup_RejectsDuplicateEmail(t *testing.T) { … }
 ```
+
+The marker is `covers:` (any case) followed by one or more IDs on the same line (`# covers: AC-001, AC-002` in Python, `// covers: AC-003` in TypeScript, and so on). Any file git sees counts, except those under `specs/` and `.sdd/`. Every AC of an approved group needs at least one reference **[lint: sync]**.
 
 ## Approval and Sync Rules
 

@@ -183,16 +183,19 @@ The verification commands run with the project's own shell (`sh -c`, or `cmd /C`
 
 | Command | Who | Purpose |
 |---|---|---|
-| `sdd validate <feature>` | user | Run the `integration` command and every sync check, then write `.sdd/features/<feature>/report.md` |
-| `sdd sync check [<feature>]` | anyone | Check consistency between artifacts. Available in every phase |
-| `sdd trace <ID>` / `sdd trace --matrix <feature>` | anyone | Follow one ID through spec → plan → commits → tests, or print the full matrix |
+| `sdd validate <feature>` | user | Once every group is approved: run the `integration` command in the worktree and every sync check, then write `.sdd/features/<feature>/report.md`. If everything passes, the feature becomes `validated` |
+| `sdd sync check [<feature>]` | anyone | Check consistency between artifacts. Available in every phase; the plan ↔ code level applies as soon as implementation has started |
+| `sdd trace <ID>` / `sdd trace --matrix <feature>` | anyone | Follow one ID through spec → plan → commits → tests, or print the full matrix (with Commits and Tests columns once implementation has started) |
 | `/sdd-deep-review <feature>` | user → agent | Semantic review of the code against each AC, written to `.sdd/features/<feature>/deep-review.md` |
+| `sdd review <feature> --context` | agent | CLI form of `review_context`: the brief for the deep review |
+
+The report records the verdict, who validated and when, the branch commit, the approved hash of every artifact, the integration output, every consistency problem, the groups with their commits, and the full traceability matrix. It links `deep-review.md` when one exists. After validation, merge `sdd/<feature>` by your usual process and run `sdd clean <feature>`.
 
 Sync levels, each applied as soon as its artifacts exist:
 - **spec ↔ spec:** `functional_hash` matches, every FR, NFR and AC is mapped in the technical spec, every ID the technical spec references exists in the functional spec, and every `depends_on` feature exists.
 - **spec ↔ plan:** both source hashes match, every FR and AC is covered by a task, and every covered ID exists and is not retired.
 - **approvals:** an artifact edited after its approval (`modified`) or whose sources changed after its approval (`stale`) is an error until it is re-approved.
-- **plan ↔ code:** every approved group has exactly one commit with matching trailers, and every AC is referenced by at least one test (`covers: AC-###`).
+- **plan ↔ code:** every approved group has exactly one commit on `sdd/<feature>` whose `SDD-Group` and `SDD-Tasks` trailers match the plan (a different `SDD-Covers` is a warning); commits on the branch without SDD trailers are reported as made outside `sdd`; every AC of an approved group is referenced by at least one test (`covers: AC-###`), and a reference to an unknown or retired ID is a warning. Test references are searched with `git grep` in every file git sees (outside `specs/` and `.sdd/`), in the worktree or, once it is removed, in the project.
 
 The deep review ("does the code actually satisfy AC-003?") is done by the agent from `review_context`. It only produces a report and never blocks a gate.
 

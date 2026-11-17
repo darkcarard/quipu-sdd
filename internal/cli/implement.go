@@ -105,13 +105,22 @@ func (a *App) runGroup(ctx context.Context, args []string) error {
 func (a *App) runReview(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("review")
 	diff := fs.Bool("diff", false, "also print the full diff")
-	arg, err := a.oneFeature(fs, args, "sdd review <feature> [--diff]")
+	brief := fs.Bool("context", false, "print the brief for a deep review of the implemented feature (what review_context returns)")
+	arg, err := a.oneFeature(fs, args, "sdd review <feature> [--diff | --context]")
 	if err != nil {
 		return err
 	}
 	p, err := a.open()
 	if err != nil {
 		return err
+	}
+	if *brief {
+		text, err := p.ReviewContext(ctx, arg)
+		if err != nil {
+			return err
+		}
+		fmt.Fprint(a.Stdout, text)
+		return nil
 	}
 	r, err := p.Review(ctx, arg, *diff)
 	if err != nil {
@@ -194,5 +203,26 @@ func (a *App) runClean(ctx context.Context, args []string) error {
 		return err
 	}
 	fmt.Fprintln(a.Stdout, msg)
+	return nil
+}
+
+func (a *App) runValidate(ctx context.Context, args []string) error {
+	fs := a.newFlagSet("validate")
+	arg, err := a.oneFeature(fs, args, "sdd validate <feature>")
+	if err != nil {
+		return err
+	}
+	p, err := a.open()
+	if err != nil {
+		return err
+	}
+	r, err := p.Validate(ctx, arg)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(a.Stdout, app.FormatValidation(r))
+	if !r.Passed {
+		return errFailed
+	}
 	return nil
 }

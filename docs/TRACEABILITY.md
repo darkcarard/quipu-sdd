@@ -21,7 +21,7 @@ AC-003  (user-signup/functional.md · FR-001)
   └─ tests:     internal/signup/service_test.go:TestSignup_RejectsDuplicateEmail
 ```
 
-An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqualified, every feature is searched. Besides FR, NFR and AC, `sdd trace` also shows ADRs, groups (`G#`) and tasks (`T#.#`). Commit and test links are added in M6.
+An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqualified, every feature is searched. Besides FR, NFR and AC, `sdd trace` also shows ADRs, groups (`G#`) and tasks (`T#.#`, with their group commit). Commits come from the group commits' trailers on `sdd/<feature>` and tests from `covers:` references; before implementation starts they show as "not implemented yet".
 
 `sdd trace --matrix <feature>` prints the full requirement × artifact matrix in markdown, with gaps marked **missing**. `sdd sync check` reports every gap it finds in this chain.
 

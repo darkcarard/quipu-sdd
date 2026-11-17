@@ -322,9 +322,9 @@ func (f *Feature) Next() string {
 		}
 		return fmt.Sprintf("continue with your agent (`/sdd-implement %s` in Claude Code)", n)
 	case workflow.Implemented:
-		return "sdd validate " + n + " (M6)"
+		return fmt.Sprintf("run `sdd validate %s` (integration tests and every consistency check; writes report.md)", n)
 	case workflow.Validated:
-		return fmt.Sprintf("merge branch sdd/%s", n)
+		return fmt.Sprintf("merge branch sdd/%s into your branch (merge, PR or rebase), then remove the worktree with `sdd clean %s`", n, n)
 	}
 	return ""
 }
