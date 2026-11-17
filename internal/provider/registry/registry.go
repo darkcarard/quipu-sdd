@@ -32,17 +32,29 @@ func New(cfg config.Config, opts Options) (provider.Provider, error) {
 	var p provider.Provider
 	switch cfg.Provider.Name {
 	case "anthropic":
+		if cfg.Provider.APIKeyEnv == "" {
+			cfg.Provider.APIKeyEnv = "ANTHROPIC_API_KEY"
+		}
 		key, err := cfg.APIKey()
 		if err != nil {
 			return nil, err
 		}
+		// Zero values keep the adapter's defaults.
 		aopts := []anthropic.Option{
-			anthropic.WithModel(cfg.Provider.Model),
-			anthropic.WithMaxTokens(cfg.Provider.MaxTokens),
-			anthropic.WithEffort(cfg.Provider.Effort),
 			anthropic.WithThinkingDisplay(cfg.Provider.ThinkingDisplay),
 			anthropic.WithFallbacks(cfg.Provider.Fallbacks),
-			anthropic.WithIdleTimeout(cfg.Limits.RequestTimeout),
+		}
+		if cfg.Provider.Model != "" {
+			aopts = append(aopts, anthropic.WithModel(cfg.Provider.Model))
+		}
+		if cfg.Provider.MaxTokens > 0 {
+			aopts = append(aopts, anthropic.WithMaxTokens(cfg.Provider.MaxTokens))
+		}
+		if cfg.Provider.Effort != "" {
+			aopts = append(aopts, anthropic.WithEffort(cfg.Provider.Effort))
+		}
+		if cfg.Limits.RequestTimeout > 0 {
+			aopts = append(aopts, anthropic.WithIdleTimeout(cfg.Limits.RequestTimeout))
 		}
 		if cfg.Provider.BaseURL != "" {
 			aopts = append(aopts, anthropic.WithBaseURL(cfg.Provider.BaseURL))

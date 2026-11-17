@@ -14,7 +14,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M0 (scaffold): done.** `sdd init` and `sdd version`.
 - **M1 (specs, plans and state): done.** `sdd status`, `sdd spec new [--technical]/lint/approve`, `sdd plan new/approve`, `sdd sync check` (spec↔spec, spec↔plan, approvals) and `sdd trace <ID>|--matrix`. Specs and plans are written by hand for now; the phase is derived from artifacts and approvals (`workflow.Effective`) up to `plan-approved`.
 - **M2 (Claude provider): parked.** Built and tested (`internal/provider/...`, `internal/transcript`) for an agent loop inside `sdd`, then set aside when `sdd` moved to running inside the user's agent. Kept for a possible future API mode; nothing imports it from the CLI.
-- **Next: M3.** `sdd mcp` (MCP server), `sdd guide`, `sdd init --agent claude` (`.mcp.json`, `/sdd-*` commands, permission rules) and `--agent generic` (`AGENTS.md`); Phase 1 drafted with the agent in Claude Code. Brownfield adoption is M7.
+- **M3 (agent integration + Specify): done.** `sdd mcp` (stdio, official Go SDK) with `status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check`, `trace`; `sdd guide`; `sdd init --agent claude|generic` and `--check` (never modifies existing files; ephemeral paths in `.sdd/.gitignore`); Claude Code skills `/sdd-spec`, `/sdd-tech`; agents journaled as `agent:<client>` and unable to approve (`feature.ErrHumanOnly`); commands find the project root from any subdirectory.
+- **Next: M4.** Plan with the agent: `guide plan`, `/sdd-plan`, plan drafting and validation through MCP. Brownfield adoption is M7.
 
 Update this section whenever a milestone is completed.
 
@@ -43,7 +44,10 @@ make install # go install with version ldflags
 
 ## Layout
 - `cmd/sdd`: entry point and signal handling
-- `internal/cli`: the command dispatcher, `init` and thin command wrappers over `internal/feature`
+- `internal/cli`: the command dispatcher, `init` and thin command wrappers over `internal/app`
+- `internal/app`: use cases shared by the CLI and the MCP server (results as structs, text formatters, `guide` with the embedded agent guides in `app/guides/`)
+- `internal/mcpserver`: `sdd mcp`; human-only operations are never registered as tools
+- `internal/agents`: integration files per agent (`files/claude`, `files/generic`) and the never-overwrite installer
 - `internal/config`: configuration (`sdd.yaml` plus `.env` and environment variables)
 - `internal/workflow`: phases, transitions, `Evaluate` (staleness), `Effective` (derived phase)
 - `internal/state`: `Layout` paths, atomic writes, `FeatureState`

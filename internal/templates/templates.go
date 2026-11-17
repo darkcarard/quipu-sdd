@@ -42,6 +42,27 @@ func Render(content string, vars map[string]string) string {
 	return content
 }
 
+// Missing returns the template and profile files Install would create.
+func Missing(templatesDir, profilesDir string) ([]string, error) {
+	var missing []string
+	err := fs.WalkDir(files, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		dst := filepath.Join(templatesDir, path)
+		if rel, ok := strings.CutPrefix(path, "profiles/"); ok {
+			dst = filepath.Join(profilesDir, rel)
+		}
+		if _, err := os.Stat(dst); errors.Is(err, fs.ErrNotExist) {
+			missing = append(missing, dst)
+		} else if err != nil {
+			return err
+		}
+		return nil
+	})
+	return missing, err
+}
+
 // Install copies the embedded templates into templatesDir and the profiles into
 // profilesDir. Existing files are preserved unless overwrite is true, so that
 // project customizations survive a re-run of `sdd init`. It returns the paths written.

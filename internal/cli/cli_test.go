@@ -3,8 +3,10 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,7 +42,7 @@ func TestInitCreatesProjectLayout(t *testing.T) {
 		}
 	}
 	for _, f := range []string{
-		l.ConfigFile(),
+		l.ConfigFile(), l.GitignoreFile(),
 		filepath.Join(l.TemplatesDir(), "functional.md"),
 		filepath.Join(l.TemplatesDir(), "technical.md"),
 		filepath.Join(l.TemplatesDir(), "plan.md"),
@@ -50,25 +52,22 @@ func TestInitCreatesProjectLayout(t *testing.T) {
 			t.Errorf("missing file %s", f)
 		}
 	}
-
-	cfg, err := config.Load(dir)
-	if err != nil {
+	if _, err := config.Load(dir); err != nil {
 		t.Fatalf("generated sdd.yaml does not load: %v", err)
 	}
-	if cfg.Provider.Name != "anthropic" {
-		t.Errorf("provider = %q", cfg.Provider.Name)
+	if b, _ := os.ReadFile(filepath.Join(dir, "sdd.yaml")); strings.Contains(string(b), "provider") || strings.Contains(string(b), "API") {
+		t.Errorf("sdd.yaml must not configure an LLM provider:\n%s", b)
 	}
-
-	gi, _ := os.ReadFile(l.GitignoreFile())
-	if !strings.HasPrefix(string(gi), "node_modules/\n") {
-		t.Errorf("existing .gitignore content should be preserved:\n%s", gi)
+	if gi, _ := os.ReadFile(filepath.Join(dir, ".gitignore")); string(gi) != "node_modules/" {
+		t.Errorf("the project's .gitignore must not be modified:\n%s", gi)
 	}
-	for _, e := range state.GitignoreEntries {
-		if !strings.Contains(string(gi), e+"\n") {
-			t.Errorf(".gitignore missing %s", e)
-		}
+	if gi, _ := os.ReadFile(l.GitignoreFile()); !strings.Contains(string(gi), "worktrees/") || !strings.Contains(string(gi), "locks/") {
+		t.Errorf(".sdd/.gitignore = %q", gi)
 	}
-	if !strings.Contains(out, "sdd spec new") {
+	if _, err := os.Stat(filepath.Join(dir, ".mcp.json")); err == nil {
+		t.Error("agent files are only installed with --agent")
+	}
+	if !strings.Contains(out, "sdd init --agent claude") {
 		t.Errorf("should suggest next step, got:\n%s", out)
 	}
 }
@@ -79,10 +78,9 @@ func TestInitIsIdempotentAndKeepsCustomizations(t *testing.T) {
 		t.Fatal(e)
 	}
 	l := state.Layout{Root: dir}
-	os.WriteFile(l.ConfigFile(), []byte("provider:\n  name: anthropic\n  model: custom\n"), 0o644)
+	os.WriteFile(l.ConfigFile(), []byte("limits:\n  max_files_per_task: 7\n"), 0o644)
 	tpl := filepath.Join(l.TemplatesDir(), "functional.md")
 	os.WriteFile(tpl, []byte("custom template"), 0o644)
-	giBefore, _ := os.ReadFile(l.GitignoreFile())
 
 	code, out, e := run(t, dir, "init")
 	if code != ExitOK {
@@ -91,14 +89,11 @@ func TestInitIsIdempotentAndKeepsCustomizations(t *testing.T) {
 	if !strings.Contains(e, "not a git repository") {
 		t.Error("should warn outside a git repo")
 	}
-	if b, _ := os.ReadFile(l.ConfigFile()); !strings.Contains(string(b), "model: custom") {
+	if b, _ := os.ReadFile(l.ConfigFile()); !strings.Contains(string(b), "max_files_per_task: 7") {
 		t.Error("sdd.yaml was overwritten")
 	}
 	if b, _ := os.ReadFile(tpl); string(b) != "custom template" {
 		t.Error("template customization was overwritten")
-	}
-	if giAfter, _ := os.ReadFile(l.GitignoreFile()); !bytes.Equal(giBefore, giAfter) {
-		t.Errorf(".gitignore changed on re-run:\n%s", giAfter)
 	}
 	if strings.Contains(out, "created") {
 		t.Errorf("second init should create nothing:\n%s", out)
@@ -109,6 +104,111 @@ func TestInitIsIdempotentAndKeepsCustomizations(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(tpl); string(b) == "custom template" {
 		t.Error("--force should restore built-in templates")
+	}
+}
+
+func TestInitAgentClaude(t *testing.T) {
+	dir := t.TempDir()
+	code, out, e := run(t, dir, "init", "--agent", "claude")
+	if code != ExitOK {
+		t.Fatal(e)
+	}
+	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md"} {
+		if !strings.Contains(out, "created  "+f) {
+			t.Errorf("%s not created:\n%s", f, out)
+		}
+	}
+	var mcpCfg struct {
+		MCPServers map[string]struct {
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+		} `json:"mcpServers"`
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, ".mcp.json"))
+	if err := json.Unmarshal(b, &mcpCfg); err != nil || mcpCfg.MCPServers["sdd"].Command != "sdd" || strings.Join(mcpCfg.MCPServers["sdd"].Args, " ") != "mcp" {
+		t.Errorf(".mcp.json = %s (%v)", b, err)
+	}
+	var settings struct {
+		Permissions struct{ Allow, Deny []string } `json:"permissions"`
+	}
+	b, _ = os.ReadFile(filepath.Join(dir, ".claude", "settings.json"))
+	if err := json.Unmarshal(b, &settings); err != nil {
+		t.Fatal(err)
+	}
+	for _, rule := range []string{"Bash(sdd spec approve *)", "Bash(sdd plan approve *)", "Bash(sdd approve *)", "Bash(sdd revise *)"} {
+		if !slices.Contains(settings.Permissions.Deny, rule) {
+			t.Errorf("deny rules miss %s: %v", rule, settings.Permissions.Deny)
+		}
+	}
+	if !slices.Contains(settings.Permissions.Allow, "mcp__sdd__*") {
+		t.Errorf("allow = %v", settings.Permissions.Allow)
+	}
+	skill, _ := os.ReadFile(filepath.Join(dir, ".claude", "skills", "sdd-spec", "SKILL.md"))
+	if !strings.Contains(string(skill), "description:") || !strings.Contains(string(skill), "$ARGUMENTS") {
+		t.Errorf("skill = %s", skill)
+	}
+	if code, out, _ := run(t, dir, "init", "--agent", "claude", "--check"); code != ExitOK || !strings.Contains(out, "Everything is in place") {
+		t.Errorf("check after init: %d\n%s", code, out)
+	}
+	if code, out, _ := run(t, dir, "init", "--agent", "claude"); code != ExitOK || strings.Contains(out, "created") {
+		t.Errorf("second run must create nothing: %d\n%s", code, out)
+	}
+}
+
+// TestInitNeverModifiesExistingFiles covers projects that already have agent files.
+func TestInitNeverModifiesExistingFiles(t *testing.T) {
+	dir := t.TempDir()
+	existing := map[string]string{
+		".mcp.json":             `{"mcpServers":{"other":{"command":"x"}}}`,
+		".claude/settings.json": `{"permissions":{"allow":["Bash(make *)"]}}`,
+		"AGENTS.md":             "# Our own agent rules\n",
+	}
+	for p, c := range existing {
+		os.MkdirAll(filepath.Dir(filepath.Join(dir, p)), 0o755)
+		os.WriteFile(filepath.Join(dir, p), []byte(c), 0o644)
+	}
+
+	code, out, _ := run(t, dir, "init", "--agent", "claude", "--check")
+	if code != ExitError || !strings.Contains(out, "missing  sdd.yaml") || !strings.Contains(out, "kept     .mcp.json") {
+		t.Errorf("check: %d\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "sdd.yaml")); err == nil {
+		t.Error("--check must not write anything")
+	}
+
+	for _, agent := range []string{"claude", "generic"} {
+		code, out, e := run(t, dir, "init", "--agent", agent)
+		if code != ExitOK {
+			t.Fatalf("%s: %s", agent, e)
+		}
+		if agent == "claude" && (!strings.Contains(out, "kept     .mcp.json (exists; not modified)") || !strings.Contains(out, `"sdd": {`) ||
+			!strings.Contains(out, "Bash(sdd spec approve *)") || !strings.Contains(out, "created  .claude/skills/sdd-spec/SKILL.md")) {
+			t.Errorf("claude output:\n%s", out)
+		}
+		if agent == "generic" && !strings.Contains(out, "kept     AGENTS.md") {
+			t.Errorf("generic output:\n%s", out)
+		}
+	}
+	for p, c := range existing {
+		if b, _ := os.ReadFile(filepath.Join(dir, p)); string(b) != c {
+			t.Errorf("%s was modified:\n%s", p, b)
+		}
+	}
+
+	// A file that already has the integration counts as present.
+	dir2 := t.TempDir()
+	os.WriteFile(filepath.Join(dir2, ".mcp.json"), []byte(`{"mcpServers":{"sdd":{"command":"/usr/local/bin/sdd","args":["mcp"]}}}`), 0o644)
+	if _, out, _ := run(t, dir2, "init", "--agent", "claude"); !strings.Contains(out, "ok       .mcp.json") {
+		t.Errorf("an existing sdd server must be accepted:\n%s", out)
+	}
+	if _, out, _ := run(t, dir2, "init", "--agent", "generic"); !strings.Contains(out, "created  AGENTS.md") {
+		t.Errorf("AGENTS.md:\n%s", out)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir2, "AGENTS.md")); !strings.Contains(string(b), "Approvals belong to the user") || strings.Contains(string(b), "{{workflow}}") {
+		t.Errorf("AGENTS.md = %s", b)
+	}
+	if code, _, _ := run(t, dir2, "init", "--agent", "cursor"); code != ExitUsage {
+		t.Error("an unknown agent is a usage error")
 	}
 }
 
@@ -126,7 +226,7 @@ func TestVersionHelpAndUnknown(t *testing.T) {
 	if code, _, e := run(t, dir, "bogus"); code != ExitUsage || !strings.Contains(e, "unknown command") {
 		t.Fatalf("unknown: %d %q", code, e)
 	}
-	if code, _, e := run(t, dir, "plan", "x"); code != ExitError || !strings.Contains(e, "M4") {
+	if code, _, e := run(t, dir, "implement", "x"); code != ExitError || !strings.Contains(e, "M5") {
 		t.Fatalf("unimplemented command should name its milestone: %d %q", code, e)
 	}
 	if code, _, _ := run(t, dir, "init", "extra"); code != ExitUsage {

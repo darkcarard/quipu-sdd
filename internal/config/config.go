@@ -91,66 +91,50 @@ type Audit struct {
 }
 
 // Default returns the built-in configuration.
+//
+// Provider, MCPServers, Audit and the API-mode limits configure the parked API
+// mode (an agent loop inside sdd); they are not written to a new sdd.yaml and
+// nothing in the CLI uses them.
 func Default() Config {
 	return Config{
 		FrameworkVersion: version.LayoutVersion,
-		Provider: Provider{
-			Name:      "anthropic",
-			Model:     "claude-opus-5-5",
-			APIKeyEnv: "ANTHROPIC_API_KEY",
-			MaxTokens: 64000,
-			Effort:    "high",
-			Fallbacks: true,
-		},
 		Limits: Limits{
-			MaxIterationsPerTask: 30,
-			MaxFixAttempts:       3,
-			MaxFilesPerTask:      5,
-			MaxRetries:           5,
-			RequestTimeout:       5 * time.Minute,
-			CommandTimeout:       10 * time.Minute,
+			MaxFixAttempts:  3,
+			MaxFilesPerTask: 5,
+			CommandTimeout:  10 * time.Minute,
 		},
-		MCPServers: []MCPServer{},
-		Audit:      Audit{RedactPatterns: []string{}},
 	}
 }
 
 // DefaultYAML is the commented sdd.yaml written by `sdd init`. It must decode to Default().
 func DefaultYAML() string {
 	return fmt.Sprintf(`# SDD framework project configuration. See docs/BRIEF.md.
-# Secrets (API keys) never go here: set them in the environment or in .env.
+# sdd never calls an LLM: the coding agent you run it with does the reasoning.
 framework_version: %d
 
-provider:
-  name: anthropic             # anthropic | gemini | openai
-  model: claude-opus-5-5
-  api_key_env: ANTHROPIC_API_KEY
-  max_tokens: 64000           # per response, thinking included
-  effort: high                # low | medium | high | xhigh | max
-  thinking_display: ""        # omitted (default) | summarized | updates
-  fallbacks: true             # re-serve declined requests with a fallback model
-  base_url: ""                # empty: the provider's official endpoint
-
 limits:
-  max_iterations_per_task: 30 # agent turns per task
-  max_fix_attempts: 3         # verification fix loops per group
   max_files_per_task: 5       # plan validation: keeps tasks reviewable
-  max_retries: 5              # provider retries (429/5xx/529/network)
-  request_timeout: 5m         # abandon a response after this long without data
-  command_timeout: 10m
-  token_budget: 0             # per run; 0 = unlimited
-
-# MCP servers spawned over stdio. Only allow_tools are exposed to the agent.
-mcp_servers: []
-#  - name: filesystem
-#    command: npx
-#    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
-#    allow_tools: [read_file, write_file, list_directory]
-
-audit:
-  commit_transcripts: false   # .sdd/runs/ is git-ignored unless true
-  redact_patterns: []         # extra regexps redacted from transcripts
+  max_fix_attempts: 3         # group verification failures before the group is marked failed
+  command_timeout: 10m        # build, lint and test commands are killed after this long
 `, version.LayoutVersion)
+}
+
+// FindRoot returns the nearest directory at or above dir that contains sdd.yaml.
+func FindRoot(dir string) (string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	for d := abs; ; {
+		if _, err := os.Stat(filepath.Join(d, FileName)); err == nil {
+			return d, nil
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return "", fmt.Errorf("no %s in %s or any parent directory: run `sdd init` first", FileName, abs)
+		}
+		d = parent
+	}
 }
 
 // Load reads <root>/sdd.yaml (missing fields keep their defaults), merges
@@ -186,31 +170,33 @@ func Load(root string) (Config, error) {
 // Validate checks values that would otherwise fail later in confusing ways.
 func (c Config) Validate() error {
 	var errs []error
-	switch c.Provider.Name {
-	case "anthropic", "gemini", "openai":
-	default:
-		errs = append(errs, fmt.Errorf("provider.name: unsupported provider %q", c.Provider.Name))
-	}
-	if c.Provider.Model == "" {
-		errs = append(errs, errors.New("provider.model: required"))
-	}
-	switch c.Provider.Effort {
-	case "", "low", "medium", "high", "xhigh", "max":
-	default:
-		errs = append(errs, fmt.Errorf("provider.effort: %q is not one of low, medium, high, xhigh, max", c.Provider.Effort))
-	}
-	switch c.Provider.ThinkingDisplay {
-	case "", "omitted", "summarized", "updates":
-	default:
-		errs = append(errs, fmt.Errorf("provider.thinking_display: %q is not one of omitted, summarized, updates", c.Provider.ThinkingDisplay))
-	}
-	if c.Provider.MaxTokens < 1 {
-		errs = append(errs, errors.New("provider.max_tokens: must be >= 1"))
+	if c.Provider.Name != "" { // parked API mode: checked only when configured
+		switch c.Provider.Name {
+		case "anthropic", "gemini", "openai":
+		default:
+			errs = append(errs, fmt.Errorf("provider.name: unsupported provider %q", c.Provider.Name))
+		}
+		switch c.Provider.Effort {
+		case "", "low", "medium", "high", "xhigh", "max":
+		default:
+			errs = append(errs, fmt.Errorf("provider.effort: %q is not one of low, medium, high, xhigh, max", c.Provider.Effort))
+		}
+		switch c.Provider.ThinkingDisplay {
+		case "", "omitted", "summarized", "updates":
+		default:
+			errs = append(errs, fmt.Errorf("provider.thinking_display: %q is not one of omitted, summarized, updates", c.Provider.ThinkingDisplay))
+		}
+		if c.Provider.MaxTokens < 0 {
+			errs = append(errs, errors.New("provider.max_tokens: must be >= 0"))
+		}
 	}
 	for i, p := range c.Audit.RedactPatterns {
 		if _, err := regexp.Compile(p); err != nil {
 			errs = append(errs, fmt.Errorf("audit.redact_patterns[%d]: %w", i, err))
 		}
+	}
+	if c.Limits.MaxFixAttempts < 0 {
+		errs = append(errs, errors.New("limits.max_fix_attempts: must be >= 0"))
 	}
 	if c.Limits.MaxFilesPerTask < 1 {
 		errs = append(errs, errors.New("limits.max_files_per_task: must be >= 1"))

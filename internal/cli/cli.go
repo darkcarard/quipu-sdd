@@ -1,4 +1,5 @@
-// Package cli implements the sdd command-line interface.
+// Package cli implements the sdd command-line interface: a thin layer over the
+// use cases in internal/app, which the MCP server shares.
 package cli
 
 import (
@@ -7,13 +8,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/darkcarard/sdd-framework/internal/agents"
+	"github.com/darkcarard/sdd-framework/internal/app"
 	"github.com/darkcarard/sdd-framework/internal/config"
 	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/state"
@@ -30,7 +33,7 @@ const (
 
 // App holds the I/O and working directory for a CLI invocation.
 type App struct {
-	Dir    string // project root (the current directory by default)
+	Dir    string // working directory; commands find the project root at or above it
 	Stdout io.Writer
 	Stderr io.Writer
 
@@ -49,17 +52,19 @@ type command struct {
 
 func (a *App) commands() []command {
 	return []command{
-		{name: "init", summary: "Install the SDD framework in the current project", run: (*App).runInit},
+		{name: "init", summary: "Set up sdd in the current project (and an agent with --agent)", run: (*App).runInit},
 		{name: "version", summary: "Print the sdd version", run: (*App).runVersion},
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
+		{name: "guide", summary: "Print the drafting instructions and template for a topic", run: (*App).runGuide},
+		{name: "mcp", summary: "Serve sdd to a coding agent over MCP (stdio)", run: (*App).runMCP},
 		{name: "feature", summary: "Show or change a feature's title and description", run: (*App).runFeature},
-		{name: "spec", summary: "Create, lint and approve specs (agent chat in M3)", run: (*App).runSpec},
-		{name: "plan", summary: "Create and approve the implementation plan (agent generation in M4)", run: (*App).runPlan},
-		{name: "implement", summary: "Implement the next task group in an isolated worktree", milestone: "M5"},
+		{name: "spec", summary: "Create, lint and approve specs", run: (*App).runSpec},
+		{name: "plan", summary: "Create and approve the implementation plan", run: (*App).runPlan},
+		{name: "implement", summary: "Start the next task group in an isolated worktree", milestone: "M5"},
 		{name: "review", summary: "Review the group awaiting approval", milestone: "M5"},
 		{name: "approve", summary: "Approve the reviewed group and continue", milestone: "M5"},
 		{name: "revise", summary: "Send review feedback to the agent for the current group", milestone: "M5"},
-		{name: "resume", summary: "Resume an interrupted run", milestone: "M5"},
+		{name: "resume", summary: "Repair state after an interruption", milestone: "M5"},
 		{name: "clean", summary: "Remove a feature worktree", milestone: "M5"},
 		{name: "validate", summary: "Run integration tests and sync checks, write the report", milestone: "M6"},
 		{name: "sync", summary: "Check consistency between specs and plan (code in M6)", run: (*App).runSync},
@@ -105,7 +110,11 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	return ExitUsage
 }
 
-var errUsage = errors.New("usage error")
+var (
+	errUsage = errors.New("usage error")
+	// errFailed makes a command exit with ExitError after it has already reported why.
+	errFailed = errors.New("failed")
+)
 
 func (a *App) usage(w io.Writer) {
 	fmt.Fprintln(w, "sdd: Spec-Driven Development framework")
@@ -126,6 +135,42 @@ func (a *App) newFlagSet(name string) *flag.FlagSet {
 	return fs
 }
 
+// parseArgs parses flags that may appear before, between or after positional
+// arguments (Go's flag package stops at the first positional one).
+func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		args = fs.Args()
+		if len(args) == 0 {
+			return pos, nil
+		}
+		if args[0] == "--" {
+			return append(pos, args[1:]...), nil
+		}
+		pos = append(pos, args[0])
+		args = args[1:]
+	}
+}
+
+func (a *App) usageErr(usage string) error {
+	fmt.Fprintln(a.Stderr, "usage: "+usage)
+	return errUsage
+}
+
+// open loads the project that contains the working directory.
+func (a *App) open() (*app.App, error) {
+	p, err := app.Open(a.Dir)
+	if err != nil {
+		return nil, err
+	}
+	p.Who, p.Now = a.Identity, a.Now
+	p.Warn = func(msg string) { fmt.Fprintln(a.Stderr, "warning: "+msg) }
+	return p, nil
+}
+
 func (a *App) runVersion(_ context.Context, args []string) error {
 	fs := a.newFlagSet("version")
 	if err := fs.Parse(args); err != nil {
@@ -136,114 +181,119 @@ func (a *App) runVersion(_ context.Context, args []string) error {
 	return nil
 }
 
+const initUsage = "sdd init [--agent claude|generic] [--check] [--force]"
+
 func (a *App) runInit(_ context.Context, args []string) error {
 	fs := a.newFlagSet("init")
 	force := fs.Bool("force", false, "overwrite templates and profiles in .sdd/ with the built-in versions")
+	agent := fs.String("agent", "", "also set up a coding agent: "+strings.Join(agents.Names, ", "))
+	check := fs.Bool("check", false, "report what is missing without writing anything")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() > 0 {
-		fmt.Fprintln(a.Stderr, "usage: sdd init [--force]")
-		return errUsage
+	if fs.NArg() > 0 || (*agent != "" && !slices.Contains(agents.Names, *agent)) || (*check && *force) {
+		return a.usageErr(initUsage)
 	}
 	l := state.Layout{Root: a.Dir}
-
 	if _, err := os.Stat(filepath.Join(a.Dir, ".git")); err != nil {
 		fmt.Fprintln(a.Stderr, "warning: not a git repository; run `git init` before `sdd implement` (worktrees need git)")
 	}
-	if err := l.Init(); err != nil {
-		return err
-	}
 
-	created, err := writeIfMissing(l.ConfigFile(), []byte(config.DefaultYAML()))
+	// sdd's own files: sdd.yaml, .sdd/.gitignore, templates and profiles.
+	own := []agents.File{
+		{Path: rel(a.Dir, l.ConfigFile()), Content: []byte(config.DefaultYAML())},
+		{Path: rel(a.Dir, l.GitignoreFile()), Content: []byte(state.Gitignore)},
+	}
+	missingTemplates, err := templates.Missing(l.TemplatesDir(), l.ProfilesDir())
 	if err != nil {
 		return err
 	}
-	if created {
-		fmt.Fprintf(a.Stdout, "created  %s\n", rel(a.Dir, l.ConfigFile()))
-	} else {
-		fmt.Fprintf(a.Stdout, "kept     %s\n", rel(a.Dir, l.ConfigFile()))
+	var files []agents.File
+	if *agent != "" {
+		if files, err = agents.Files(*agent, app.WorkflowGuide()); err != nil {
+			return err
+		}
 	}
 
+	if *check {
+		results, err := agents.Install(a.Dir, append(own, files...), true)
+		if err != nil {
+			return err
+		}
+		incomplete := a.report(results)
+		for _, p := range missingTemplates {
+			fmt.Fprintf(a.Stdout, "missing  %s\n", rel(a.Dir, p))
+		}
+		if incomplete || len(missingTemplates) > 0 {
+			fmt.Fprintln(a.Stdout, "\nRun `sdd init` (with the same --agent) to create what is missing.")
+			return errFailed
+		}
+		fmt.Fprintln(a.Stdout, "Everything is in place.")
+		return nil
+	}
+
+	if err := l.Init(); err != nil {
+		return err
+	}
+	results, err := agents.Install(a.Dir, own, false)
+	if err != nil {
+		return err
+	}
 	written, err := templates.Install(l.TemplatesDir(), l.ProfilesDir(), *force)
 	if err != nil {
 		return fmt.Errorf("installing templates: %w", err)
 	}
+	a.report(results)
 	for _, p := range written {
 		fmt.Fprintf(a.Stdout, "created  %s\n", rel(a.Dir, p))
 	}
-
-	added, err := ensureGitignore(l.GitignoreFile(), state.GitignoreEntries)
-	if err != nil {
-		return err
+	if len(files) > 0 {
+		results, err := agents.Install(a.Dir, files, false)
+		if err != nil {
+			return err
+		}
+		a.report(results)
 	}
-	if len(added) > 0 {
-		fmt.Fprintf(a.Stdout, "updated  .gitignore (%s)\n", strings.Join(added, ", "))
-	}
 
-	fmt.Fprintln(a.Stdout, "\nSDD initialized. Next: sdd spec new <feature>")
+	switch *agent {
+	case "claude":
+		fmt.Fprintln(a.Stdout, "\nClaude Code is set up. Restart it in this project and approve the `sdd` MCP server when asked;\nthen start with /sdd-spec <feature or description>.")
+	case "generic":
+		fmt.Fprintln(a.Stdout, "\nAGENTS.md explains the workflow to your agent. Register `sdd mcp` (stdio) as an MCP server if your agent supports it.")
+	default:
+		fmt.Fprintln(a.Stdout, "\nSDD initialized. Next: sdd init --agent claude (or generic), or sdd spec new <feature>")
+	}
 	return nil
 }
 
-func writeIfMissing(path string, data []byte) (bool, error) {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
-	if errors.Is(err, fs.ErrExist) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return false, err
-	}
-	return true, f.Close()
-}
-
-// ensureGitignore appends any missing entries under an sdd header and returns those added.
-func ensureGitignore(path string, entries []string) ([]string, error) {
-	b, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return nil, err
-	}
-	have := map[string]bool{}
-	for _, line := range strings.Split(string(b), "\n") {
-		have[strings.TrimSpace(line)] = true
-	}
-	var missing []string
-	for _, e := range entries {
-		if !have[e] {
-			missing = append(missing, e)
+// report prints install results and returns whether anything needs attention.
+func (a *App) report(results []agents.Result) bool {
+	attention := false
+	for _, r := range results {
+		switch r.Status {
+		case agents.Created:
+			fmt.Fprintf(a.Stdout, "created  %s\n", r.File.Path)
+		case agents.Present:
+			fmt.Fprintf(a.Stdout, "ok       %s\n", r.File.Path)
+		case agents.Missing:
+			attention = true
+			fmt.Fprintf(a.Stdout, "missing  %s\n", r.File.Path)
+		case agents.Kept:
+			attention = true
+			fmt.Fprintf(a.Stdout, "kept     %s (exists; not modified)\n", r.File.Path)
+			if r.File.Snippet != "" {
+				for _, line := range strings.Split(r.File.Snippet, "\n") {
+					fmt.Fprintf(a.Stdout, "         %s\n", line)
+				}
+			}
 		}
 	}
-	if len(missing) == 0 {
-		return nil, nil
-	}
-	var sb strings.Builder
-	if len(b) > 0 && !strings.HasSuffix(string(b), "\n") {
-		sb.WriteString("\n")
-	}
-	if len(b) > 0 {
-		sb.WriteString("\n")
-	}
-	sb.WriteString("# sdd framework (secrets and ephemeral state)\n")
-	for _, e := range missing {
-		sb.WriteString(e + "\n")
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	if _, err := f.WriteString(sb.String()); err != nil {
-		return nil, err
-	}
-	return missing, nil
+	return attention
 }
 
 func rel(root, p string) string {
 	if r, err := filepath.Rel(root, p); err == nil {
-		return r
+		return filepath.ToSlash(r)
 	}
 	return p
 }

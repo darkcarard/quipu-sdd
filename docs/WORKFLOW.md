@@ -31,29 +31,31 @@ Approval and review commands are human-only: they are not exposed as MCP tools, 
 **`sdd init` never modifies a file that already exists.** It creates the files that are missing; for each one that exists, it leaves it untouched and prints the snippet to add by hand (and `sdd init --check` reports what is still missing). Its own ephemeral paths are ignored through `.sdd/.gitignore`, so the project's `.gitignore` is not touched either.
 
 `sdd init --agent claude` sets up Claude Code:
-- `.mcp.json`: registers `sdd mcp` (stdio) as the `sdd` MCP server.
-- `.claude/commands/sdd-*.md`: the slash commands below. Each command carries its own instructions, so no change to `CLAUDE.md` is needed.
-- `.claude/settings.json`: permission rules that deny the agent the approval and review commands.
+- `.mcp.json`: registers `sdd mcp` (stdio) as the `sdd` MCP server. Claude Code asks once to approve a project's MCP servers.
+- `.claude/skills/sdd-*/SKILL.md`: the `/sdd-*` commands below (Claude Code skills). Each one carries its own instructions, and the MCP server sends the workflow rules to the agent when it connects, so no change to `CLAUDE.md` is needed.
+- `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`) and `deny` rules for the approval and review commands (`Bash(sdd spec approve *)` and the like). Deny rules take precedence over any allow rule. They match the command as typed, so they are a guard against mistakes, not a sandbox; the approvals' git identity and the journal record who approved.
 
 `sdd init --agent generic` writes an `AGENTS.md` that explains the workflow to any agent that reads it, if the project has none. Integration files for more agents arrive in M8.
 
-| Slash command | Starts |
-|---|---|
-| `/sdd-spec <feature or "Free text">` | Drafting the functional spec (creates the feature if needed) |
-| `/sdd-tech <feature>` | Drafting the technical spec |
-| `/sdd-plan <feature>` | Drafting the plan |
-| `/sdd-implement <feature>` | Implementing tasks until the current group is ready for review |
-| `/sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria |
-| `/sdd-adopt` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) |
+| Slash command | Starts | Available |
+|---|---|---|
+| `/sdd-spec <feature or "Free text">` | Drafting the functional spec (creates the feature if needed) | M3 |
+| `/sdd-tech <feature>` | Drafting the technical spec | M3 |
+| `/sdd-plan <feature>` | Drafting the plan | M4 |
+| `/sdd-implement <feature>` | Implementing tasks until the current group is ready for review | M5 |
+| `/sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria | M6 |
+| `/sdd-adopt` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
+
+Re-running `sdd init --agent claude` after upgrading `sdd` adds the commands of new milestones; existing ones are left as they are.
 
 ### MCP tools
 
-`sdd mcp` serves these tools. Each one calls the same code as the CLI command next to it.
+`sdd mcp` serves these tools; it finds the project from its working directory (the nearest `sdd.yaml` at or above it). Each tool calls the same code as the CLI command next to it and returns the same text. State changes made through MCP are journaled as `agent:<client>`. `status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check` and `trace` are available from M3; the others arrive with the phase that needs them.
 
 | Tool | Purpose | CLI equivalent |
 |---|---|---|
 | `status` | Phase, artifact statuses and the next action | `sdd status` |
-| `guide` | Guidelines, template and next steps for `functional`, `technical`, `plan` or `implement` | `sdd guide <topic>` |
+| `guide` | Instructions, format rules and template for `workflow`, `functional`, `technical` (`plan` in M4, `implement` in M5), plus the status of a given feature | `sdd guide <topic> [--feature <feature>]` |
 | `spec_new` | Create a feature and its functional spec, or its technical spec | `sdd spec new` |
 | `plan_new` | Create `plan.md` from the template, with the source hashes stamped | `sdd plan new` |
 | `lint` | Lint the feature's artifacts (plan validation included) | `sdd spec lint` |
@@ -216,7 +218,7 @@ Afterwards:
 ## Commands at a Glance
 
 ```
-sdd init [--agent claude|generic] [--check] | version | status [<feature>] | guide <topic> | mcp | upgrade
+sdd init [--agent claude|generic] [--check] [--force] | version | status [<feature>] | guide <topic> [--feature <f>] | mcp | upgrade
 sdd adopt --context
 sdd feature describe <feature> [--title "<title>"] [--description "<text>"]
 sdd spec new [--technical|--baseline]|lint|approve

@@ -150,7 +150,7 @@ func TestSecretsAndProviderValidation(t *testing.T) {
 	for field, yaml := range map[string]string{
 		"provider.effort":           "provider:\n  name: anthropic\n  model: m\n  effort: extreme\n",
 		"provider.thinking_display": "provider:\n  name: anthropic\n  model: m\n  thinking_display: full\n",
-		"provider.max_tokens":       "provider:\n  name: anthropic\n  model: m\n  max_tokens: 0\n",
+		"provider.max_tokens":       "provider:\n  name: anthropic\n  model: m\n  max_tokens: -1\n",
 		"audit.redact_patterns":     "audit:\n  redact_patterns: [\"(\"]\n",
 	} {
 		d := t.TempDir()
@@ -158,5 +158,23 @@ func TestSecretsAndProviderValidation(t *testing.T) {
 		if _, err := Load(d); err == nil || !strings.Contains(err.Error(), field) {
 			t.Errorf("%s: err = %v", field, err)
 		}
+	}
+}
+
+func TestFindRoot(t *testing.T) {
+	root := t.TempDir()
+	sub := filepath.Join(root, "a", "b")
+	os.MkdirAll(sub, 0o755)
+	if _, err := FindRoot(sub); err == nil || !strings.Contains(err.Error(), "run `sdd init` first") {
+		t.Errorf("no sdd.yaml: %v", err)
+	}
+	os.WriteFile(filepath.Join(root, FileName), []byte(DefaultYAML()), 0o644)
+	got, err := FindRoot(sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(root)
+	if g, _ := filepath.EvalSymlinks(got); g != want {
+		t.Errorf("FindRoot = %s, want %s", got, root)
 	}
 }

@@ -11,7 +11,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M1 done; M3 (agent integration) next.** Specs and plans can be written by hand and linted, approved, synced and traced. The Claude Code integration (MCP server and `/sdd-*` commands) arrives in M3. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M3 done.** Specs are drafted with Claude Code through the `sdd` MCP server and the `/sdd-spec` and `/sdd-tech` commands, and linted, approved, synced and traced by `sdd`. Planning with the agent arrives in M4, implementation in M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -25,14 +25,22 @@ make install
 
 ```sh
 cd your-project        # a git repository
-sdd init               # creates sdd.yaml, specs/, .sdd/ and updates .gitignore
-                       # (from M3: sdd init --agent claude also sets up Claude Code)
+sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and the Claude Code setup
+                          # (.mcp.json, /sdd-* skills, permission rules)
+```
+
+`sdd init` never modifies an existing file: it creates what is missing and prints what to add by hand for the rest (`sdd init --check` shows what is missing). Then, in Claude Code:
+
+```text
+/sdd-spec "User signup with email"     # the agent interviews you and drafts the functional spec
+! sdd spec approve user-signup --functional   # you approve (agents cannot)
+/sdd-tech user-signup                  # the agent drafts the technical spec
 ```
 
 `sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths:
 
 ```
-sdd.yaml                     # limits and settings
+sdd.yaml                     # limits
 specs/<feature>/             # functional.md, technical.md, plan.md
 .sdd/templates/, profiles/   # customizable templates and language profiles
 .sdd/features/<feature>/     # state.json, journal.jsonl, log.md, report.md

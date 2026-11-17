@@ -156,8 +156,11 @@ func TestSubcommandUsage(t *testing.T) {
 			t.Errorf("sdd %s: exit %d, want usage error", strings.Join(args, " "), code)
 		}
 	}
-	contains(t, mustRun(t, dir, ExitError, "spec", "chat", "x"), "M3")
-	contains(t, mustRun(t, dir, ExitError, "sync", "check", "--deep"), "M6")
+	contains(t, mustRun(t, dir, ExitUsage, "spec", "chat", "x"), "usage: sdd spec new")
+	contains(t, mustRun(t, dir, ExitUsage, "plan", "x"), "usage: sdd plan new")
+	contains(t, mustRun(t, dir, ExitOK, "guide", "workflow"), "Approvals belong to the user")
+	contains(t, mustRun(t, dir, ExitError, "guide", "plan"), "M4")
+	contains(t, mustRun(t, dir, ExitUsage, "guide"), "usage: sdd guide")
 	contains(t, mustRun(t, dir, ExitError, "status", "missing"), "feature not found")
 }
 
@@ -169,6 +172,18 @@ func TestLintReportsInvalidFeatureDir(t *testing.T) {
 	}
 	contains(t, mustRun(t, dir, ExitError, "spec", "lint"), "specs/Bad_Dir: error: invalid feature name")
 	contains(t, mustRun(t, dir, ExitOK, "status"), "Bad_Dir")
+}
+
+func TestCommandsWorkFromSubdirectories(t *testing.T) {
+	dir := t.TempDir()
+	mustRun(t, dir, ExitOK, "init")
+	mustRun(t, dir, ExitOK, "spec", "new", "User Signup")
+	sub := filepath.Join(dir, "internal", "pkg")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	contains(t, mustRun(t, sub, ExitOK, "status"), "user-signup  User Signup")
+	contains(t, mustRun(t, sub, ExitOK, "guide", "technical", "--feature", "user-signup"), "# Drafting a technical spec", "functional_hash")
 }
 
 func TestCommandsNeedInit(t *testing.T) {

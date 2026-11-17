@@ -245,3 +245,17 @@ func TestList(t *testing.T) {
 		t.Errorf("List = %v, %v", names, err)
 	}
 }
+
+func TestAgentsCannotApprove(t *testing.T) {
+	l := setup(t)
+	write(t, l, workflow.Functional, sddtest.Functional)
+	if _, err := load(t, l).Approve(workflow.Functional, Identity{Agent: "claude-code"}, now); !errors.Is(err, ErrHumanOnly) {
+		t.Fatalf("err = %v", err)
+	}
+	if load(t, l).Statuses[workflow.Functional] != workflow.StatusDraft {
+		t.Error("an agent's approval attempt must change nothing")
+	}
+	if got := (Identity{Name: "Ada", Email: "a@x", Agent: "claude-code"}).Actor(); got != "agent:claude-code" {
+		t.Errorf("Actor = %s", got)
+	}
+}

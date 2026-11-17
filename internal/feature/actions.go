@@ -19,15 +19,20 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
-// Identity is the person performing an action (from git config user.name/email).
+// Identity is who performs an action: a person (from git config
+// user.name/email) or, when Agent is set, a coding agent acting through MCP.
 type Identity struct {
 	Name  string
 	Email string
+	Agent string // MCP client name, e.g. "claude-code"
 }
 
-// Actor returns the journal actor, "user:<email>" (or the name when there is no email).
+// Actor returns the journal actor: "agent:<client>", "user:<email>", or "user:<name>".
 func (i Identity) Actor() string {
-	if i.Email != "" {
+	switch {
+	case i.Agent != "":
+		return "agent:" + i.Agent
+	case i.Email != "":
 		return "user:" + i.Email
 	}
 	return "user:" + i.Name
@@ -35,6 +40,8 @@ func (i Identity) Actor() string {
 
 func (i Identity) String() string {
 	switch {
+	case i.Agent != "":
+		return "agent " + i.Agent
 	case i.Name != "" && i.Email != "":
 		return fmt.Sprintf("%s <%s>", i.Name, i.Email)
 	case i.Email != "":
@@ -48,6 +55,8 @@ var (
 	ErrAlreadyApproved = errors.New("already approved")
 	// ErrBlocked is returned when lint or sync errors prevent an approval.
 	ErrBlocked = errors.New("approval blocked by errors")
+	// ErrHumanOnly is returned when an agent attempts a human-only action.
+	ErrHumanOnly = errors.New("approvals are human-only: ask the user to run the approval command")
 )
 
 // Open is like Load, but returns a new, unsaved feature when it does not exist yet.
@@ -201,6 +210,9 @@ func (f *Feature) stamp(a workflow.Artifact, content []byte) ([]byte, error) {
 // when there are no errors, records the approval in state.json and the journal.
 // The returned diagnostics include warnings (and errors with ErrBlocked).
 func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (diag.List, error) {
+	if who.Agent != "" {
+		return nil, ErrHumanOnly
+	}
 	file := f.Files[a]
 	if !file.Exists {
 		return nil, fmt.Errorf("%s does not exist: create it with `%s`", file.Rel, createCommand(f.Name, a))

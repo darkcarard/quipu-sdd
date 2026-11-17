@@ -19,7 +19,7 @@ import (
 type Layout struct{ Root string }
 
 func (l Layout) ConfigFile() string         { return filepath.Join(l.Root, "sdd.yaml") }
-func (l Layout) GitignoreFile() string      { return filepath.Join(l.Root, ".gitignore") }
+func (l Layout) GitignoreFile() string      { return filepath.Join(l.SDDDir(), ".gitignore") }
 func (l Layout) SpecsDir() string           { return filepath.Join(l.Root, "specs") }
 func (l Layout) SpecDir(f string) string    { return filepath.Join(l.SpecsDir(), f) }
 func (l Layout) SDDDir() string             { return filepath.Join(l.Root, ".sdd") }
@@ -49,8 +49,10 @@ func (l Layout) Dirs() []string {
 	}
 }
 
-// GitignoreEntries are the ephemeral or secret paths that must never be committed.
-var GitignoreEntries = []string{".env", ".sdd/worktrees/", ".sdd/locks/", ".sdd/runs/"}
+// Gitignore is the content of .sdd/.gitignore: the ephemeral paths under .sdd/
+// that must never be committed. Keeping it inside .sdd/ means the project's own
+// .gitignore is never modified.
+const Gitignore = "# sdd: ephemeral state, never committed\nworktrees/\nlocks/\nruns/\n"
 
 // Init creates the directory layout. It is idempotent.
 func (l Layout) Init() error {
