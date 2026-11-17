@@ -304,8 +304,23 @@ func (f *Feature) Next() string {
 		return fmt.Sprintf("draft the plan with your agent (`/sdd-plan %s` in Claude Code) or create it with `sdd plan new %s`", n, n)
 	case workflow.PlanDrafting:
 		return edit(workflow.Plan)
-	case workflow.PlanApproved, workflow.Implementing:
-		return "sdd implement " + n + " (M5)"
+	case workflow.PlanApproved:
+		return fmt.Sprintf("start implementing with `sdd implement %s` (creates the worktree and branch sdd/%s), then `/sdd-implement %s` in Claude Code", n, n, n)
+	case workflow.Implementing:
+		for _, g := range f.State.Groups {
+			switch g.Status {
+			case workflow.GroupApproved:
+				continue
+			case workflow.GroupAwaitingReview:
+				return fmt.Sprintf("review %s with `sdd review %s`, then `sdd approve %s` or `sdd revise %s -m \"<what to change>\"`", g.ID, n, n, n)
+			case workflow.GroupFailed:
+				return fmt.Sprintf("%s failed verification: inspect .sdd/worktrees/%s, then give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, n, n)
+			case workflow.GroupInProgress:
+				return fmt.Sprintf("continue %s with your agent (`/sdd-implement %s` in Claude Code)", g.ID, n)
+			}
+			return fmt.Sprintf("start %s with your agent (`/sdd-implement %s` in Claude Code)", g.ID, n)
+		}
+		return fmt.Sprintf("continue with your agent (`/sdd-implement %s` in Claude Code)", n)
 	case workflow.Implemented:
 		return "sdd validate " + n + " (M6)"
 	case workflow.Validated:

@@ -17,10 +17,10 @@ import (
 var guides embed.FS
 
 // GuideTopics are the topics `sdd guide` serves.
-var GuideTopics = []string{"workflow", "functional", "technical", "plan"}
+var GuideTopics = []string{"workflow", "functional", "technical", "plan", "implement"}
 
 // upcoming are guide topics that arrive with a later milestone.
-var upcoming = map[string]string{"implement": "M5"}
+var upcoming = map[string]string{}
 
 // WorkflowGuide is the overview of how an agent works with sdd.
 func WorkflowGuide() string {
@@ -34,6 +34,16 @@ func (a *App) Guide(topic, arg string) (string, error) {
 	switch topic {
 	case "workflow":
 		return WorkflowGuide(), nil
+	case "implement":
+		b, err := guides.ReadFile("guides/implement.md")
+		if err != nil || arg == "" {
+			return string(b), err
+		}
+		d, err := a.Status(arg)
+		if err != nil {
+			return "", err
+		}
+		return string(b) + "\n## This feature\n\n" + FormatDetail(d), nil
 	case "functional", "technical", "plan":
 	default:
 		if m, ok := upcoming[topic]; ok {

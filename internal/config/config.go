@@ -119,7 +119,22 @@ limits:
 `, version.LayoutVersion)
 }
 
+// outsideWorktree maps a feature worktree (<root>/.sdd/worktrees/<feature>, which
+// holds its own checked-out copy of sdd.yaml) to the project that owns it.
+func outsideWorktree(d string) string {
+	worktrees := filepath.Dir(d)
+	if filepath.Base(worktrees) != "worktrees" || filepath.Base(filepath.Dir(worktrees)) != ".sdd" {
+		return d
+	}
+	root := filepath.Dir(filepath.Dir(worktrees))
+	if _, err := os.Stat(filepath.Join(root, FileName)); err == nil {
+		return root
+	}
+	return d
+}
+
 // FindRoot returns the nearest directory at or above dir that contains sdd.yaml.
+// Inside a feature worktree it returns the project that owns the worktree.
 func FindRoot(dir string) (string, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -127,7 +142,7 @@ func FindRoot(dir string) (string, error) {
 	}
 	for d := abs; ; {
 		if _, err := os.Stat(filepath.Join(d, FileName)); err == nil {
-			return d, nil
+			return outsideWorktree(d), nil
 		}
 		parent := filepath.Dir(d)
 		if parent == d {

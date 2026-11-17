@@ -177,4 +177,14 @@ func TestFindRoot(t *testing.T) {
 	if g, _ := filepath.EvalSymlinks(got); g != want {
 		t.Errorf("FindRoot = %s, want %s", got, root)
 	}
+
+	// A worktree has its own copy of sdd.yaml; its project is the owner.
+	wt := filepath.Join(root, ".sdd", "worktrees", "signup", "internal")
+	os.MkdirAll(wt, 0o755)
+	os.WriteFile(filepath.Join(root, ".sdd", "worktrees", "signup", FileName), []byte(DefaultYAML()), 0o644)
+	if got, _ := FindRoot(wt); got != root {
+		if g, _ := filepath.EvalSymlinks(got); g != want {
+			t.Errorf("FindRoot in a worktree = %s, want %s", got, root)
+		}
+	}
 }

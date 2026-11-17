@@ -148,15 +148,15 @@ Validation (deterministic):
 
 | Command | Who | Purpose |
 |---|---|---|
-| `sdd implement <feature>` | user | Create or repair worktree `.sdd/worktrees/<feature>` (branch `sdd/<feature>`) and start the next pending group |
+| `sdd implement <feature>` | user | Create (or repair) the worktree `.sdd/worktrees/<feature>` on branch `sdd/<feature>` from the current `HEAD`, and start the first group. The repository needs at least one commit |
 | `/sdd-implement <feature>` | user → agent | Work through the group's tasks with `task_next` / `task_done`, then `group_verify` |
-| `sdd task next <feature>` / `sdd task done <feature>` | agent | CLI forms of the MCP tools |
+| `sdd task next <feature>` / `sdd task done <feature> [--summary "…"]` | agent | CLI forms of the MCP tools |
 | `sdd group verify <feature>` | agent | CLI form of `group_verify` |
-| `sdd review <feature>` | **user** | Show the group summary, the diff, test results, covered IDs and any changes outside the declared files |
-| `sdd approve <feature>` | **user** | Approve the group under review; the next `sdd implement` starts the next group |
+| `sdd review <feature> [--diff]` | **user** | Show the group: its commit, tasks with covered IDs and the agent's summaries, the verification results, the changes (`--diff` for the full diff) and any files changed outside the declared ones |
+| `sdd approve <feature>` | **user** | Approve the group under review; the agent's next `task_next` starts the next group |
 | `sdd revise <feature> -m "<feedback>"` | **user** | Send the group back with feedback; the agent gets it from `task_next` |
-| `sdd resume <feature>` | user | Repair state after an interruption (see [TRACEABILITY.md](TRACEABILITY.md)) |
-| `sdd clean <feature>` | user | Remove the worktree |
+| `sdd resume <feature> [--discard] [--force-unlock]` | **user** | Repair state after an interruption (see [TRACEABILITY.md](TRACEABILITY.md)) |
+| `sdd clean <feature> [--force]` | **user** | Remove the worktree; the branch and its commits are kept, and the next command that needs the worktree recreates it |
 
 For each group:
 1. `task_next` returns the next pending task, or the one still in progress after an interruption: its description, `files`, `done_when`, `verify`, the text of every FR and AC it covers, the language profile `.sdd/profiles/<language>.md` and the worktree path. The task becomes `in-progress`.
@@ -173,9 +173,11 @@ For each group:
    SDD-Covers: FR-001, AC-001, AC-002
    SDD-Run: <run-id>
    ```
-6. The group moves to `awaiting-review`. `group_verify` tells the agent to stop and ask the user to review; `task_next` refuses to start another group until the user approves.
+6. The group moves to `awaiting-review`. `group_verify` tells the agent to stop and ask the user to review; `task_next` returns "stop" until the user approves, and after the approval it starts the next group.
 
-The agent never commits itself, and a group never advances while the code fails to build or its tests fail. After `sdd revise`, `task_next` returns the feedback instead of a task; the agent addresses it and calls `group_verify` again.
+The agent never commits itself, and a group never advances while the code fails to build or its tests fail. After `sdd revise`, `task_next` returns the feedback (and the group's changes so far) instead of a task; the agent addresses it and calls `group_verify` again, which squashes the group into a single commit once more. A `failed` group also goes back to the agent through `sdd revise`, with guidance. If a spec or the plan is edited during implementation, the feature leaves `implementing` (it becomes stale) and every implementation command stops until the artifacts are re-approved.
+
+The verification commands run with the project's own shell (`sh -c`, or `cmd /C` on Windows) in the worktree and are killed, with their child processes, after `limits.command_timeout`. The last 16 KB of their output are kept for the agent and the review.
 
 ## Phase 4: Validate (integration + synchronization)
 

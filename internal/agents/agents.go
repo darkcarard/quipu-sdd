@@ -24,7 +24,7 @@ var files embed.FS
 var Names = []string{"claude", "generic"}
 
 // DeniedCommands are the human-only commands the agent must not run.
-var DeniedCommands = []string{"sdd spec approve", "sdd plan approve", "sdd approve", "sdd revise"}
+var DeniedCommands = []string{"sdd spec approve", "sdd plan approve", "sdd approve", "sdd revise", "sdd resume", "sdd clean"}
 
 // File is one integration file.
 type File struct {

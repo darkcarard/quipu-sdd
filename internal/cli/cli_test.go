@@ -113,7 +113,7 @@ func TestInitAgentClaude(t *testing.T) {
 	if code != ExitOK {
 		t.Fatal(e)
 	}
-	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md", ".claude/skills/sdd-plan/SKILL.md"} {
+	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md", ".claude/skills/sdd-plan/SKILL.md", ".claude/skills/sdd-implement/SKILL.md"} {
 		if !strings.Contains(out, "created  "+f) {
 			t.Errorf("%s not created:\n%s", f, out)
 		}
@@ -135,7 +135,7 @@ func TestInitAgentClaude(t *testing.T) {
 	if err := json.Unmarshal(b, &settings); err != nil {
 		t.Fatal(err)
 	}
-	for _, rule := range []string{"Bash(sdd spec approve *)", "Bash(sdd plan approve *)", "Bash(sdd approve *)", "Bash(sdd revise *)"} {
+	for _, rule := range []string{"Bash(sdd spec approve *)", "Bash(sdd plan approve *)", "Bash(sdd approve *)", "Bash(sdd revise *)", "Bash(sdd resume *)", "Bash(sdd clean *)"} {
 		if !slices.Contains(settings.Permissions.Deny, rule) {
 			t.Errorf("deny rules miss %s: %v", rule, settings.Permissions.Deny)
 		}
@@ -226,7 +226,7 @@ func TestVersionHelpAndUnknown(t *testing.T) {
 	if code, _, e := run(t, dir, "bogus"); code != ExitUsage || !strings.Contains(e, "unknown command") {
 		t.Fatalf("unknown: %d %q", code, e)
 	}
-	if code, _, e := run(t, dir, "implement", "x"); code != ExitError || !strings.Contains(e, "M5") {
+	if code, _, e := run(t, dir, "validate", "x"); code != ExitError || !strings.Contains(e, "M6") {
 		t.Fatalf("unimplemented command should name its milestone: %d %q", code, e)
 	}
 	if code, _, _ := run(t, dir, "init", "extra"); code != ExitUsage {

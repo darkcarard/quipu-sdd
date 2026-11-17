@@ -16,6 +16,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/config"
 	"github.com/darkcarard/sdd-framework/internal/diag"
 	"github.com/darkcarard/sdd-framework/internal/feature"
+	"github.com/darkcarard/sdd-framework/internal/implement"
 	"github.com/darkcarard/sdd-framework/internal/journal"
 	"github.com/darkcarard/sdd-framework/internal/lock"
 	"github.com/darkcarard/sdd-framework/internal/plan"
@@ -272,6 +273,10 @@ type Detail struct {
 	Interrupted []Interrupted `json:"interrupted,omitempty"`
 	Lock        string        `json:"lock,omitempty"`
 	Next        string        `json:"next"`
+	// Implementation progress (from implementing on).
+	Worktree string                `json:"worktree,omitempty"`
+	Branch   string                `json:"branch,omitempty"`
+	Groups   []implement.GroupView `json:"groups,omitempty"`
 }
 
 // Status returns the detailed status of one feature.
@@ -281,6 +286,9 @@ func (a *App) Status(arg string) (Detail, error) {
 		return Detail{}, err
 	}
 	d := Detail{Summary: summarize(f), Description: f.State.Description, Next: f.Next()}
+	if len(f.State.Groups) > 0 {
+		d.Worktree, d.Branch, d.Groups = f.State.Worktree, f.State.Branch, implement.Progress(f)
+	}
 	if f.Saved && f.State.Phase != f.Phase {
 		d.StoredPhase = string(f.State.Phase)
 	}

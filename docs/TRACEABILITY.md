@@ -76,14 +76,16 @@ Recovery rests on three principles:
 
 ### `sdd resume <feature>`
 1. **Acquire the lock.** A lock whose PID is no longer alive on the same host is taken over. `--force-unlock` overrides any other lock.
-2. **Reconcile the journal.** Every `started` event without a matching end is marked `interrupted`.
-3. **Check artifact hashes.** If a spec or the plan changed since approval, mark the affected artifacts stale and stop for re-approval.
+2. **Reconcile the journal.** Every `started` event without a matching end is closed with a `failed` event (detail: interrupted).
+3. **Check artifact hashes.** If a spec or the plan changed since approval, the feature is no longer `implementing` (see the staleness rule): `resume` reports the next step and the affected artifacts must be re-approved.
 4. **Check the worktree.**
-   - If it is missing, recreate it from branch `sdd/<feature>`.
-   - If `HEAD` differs from the checkpoint SHA, rebuild group and task state from the `SDD-*` trailers in the branch history.
+   - If it is missing, recreate it from branch `sdd/<feature>` (every sdd command that needs the worktree does this too).
+   - If `HEAD` differs from the last checkpoint SHA, warn: commits were made outside `sdd`. State is not rebuilt from the branch; inspect the history, and use `--discard` to return to the checkpoint if needed.
 5. **Handle leftover changes** from the interrupted task:
    - `--keep` (default): keep the changes; `task_next` hands the current diff to the agent with the task.
    - `--discard`: reset the worktree to the last checkpoint and restart the task from scratch.
 6. **Report the next step.** Phases 1 and 2 need no repair (the artifacts are on disk); in Phase 3 the next `task_next` continues with the first task that is not done.
 
-`sdd status <feature>` shows the current state, any interrupted action, the lock holder and the exact next command to run.
+`sdd status <feature>` shows the current state, the progress of every group and task, any interrupted action, the lock holder and the exact next command to run.
+
+`sdd resume` and `sdd clean` can throw work away, so the permission rules installed by `sdd init --agent claude` deny them to the agent along with the approvals.

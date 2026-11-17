@@ -159,7 +159,7 @@ func TestSubcommandUsage(t *testing.T) {
 	contains(t, mustRun(t, dir, ExitUsage, "spec", "chat", "x"), "usage: sdd spec new")
 	contains(t, mustRun(t, dir, ExitUsage, "plan", "x"), "usage: sdd plan new")
 	contains(t, mustRun(t, dir, ExitOK, "guide", "workflow"), "Approvals belong to the user")
-	contains(t, mustRun(t, dir, ExitError, "guide", "implement"), "M5")
+	contains(t, mustRun(t, dir, ExitOK, "guide", "implement"), "# Implementing a feature")
 	contains(t, mustRun(t, dir, ExitUsage, "guide"), "usage: sdd guide")
 	contains(t, mustRun(t, dir, ExitError, "status", "missing"), "feature not found")
 }

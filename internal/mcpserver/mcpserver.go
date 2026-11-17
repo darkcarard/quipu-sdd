@@ -19,7 +19,7 @@ import (
 const Name = "sdd"
 
 // Tools lists the tool names, in registration order.
-var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace"}
+var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace", "task_next", "task_done", "group_verify"}
 
 // Run serves the project over stdin/stdout until ctx is cancelled or the client disconnects.
 func Run(ctx context.Context, a *app.App) error {
@@ -49,7 +49,7 @@ func New(a *app.App) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "guide",
 		Description: "Get the instructions, format rules and template for drafting an artifact. " +
-			"Topics: workflow (how to work with sdd), functional, technical, plan. Pass a feature to include its current status (and, for plan, the checklist of IDs to cover). Call it before drafting.",
+			"Topics: workflow (how to work with sdd), functional, technical, plan, implement. Pass a feature to include its current status (and, for plan, the checklist of IDs to cover). Call it before drafting.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in guideArgs) (*mcp.CallToolResult, any, error) {
 		return text(a.Guide(in.Topic, in.Feature))
@@ -109,7 +109,45 @@ func New(a *app.App) *mcp.Server {
 		entries, err := a.Trace(in.ID)
 		return text(app.FormatTrace(entries), err)
 	})
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "task_next",
+		Description: "Implementation: get the next step for a feature being implemented. Returns the task to implement (with the spec text it covers, " +
+			"its files, the worktree path, the commands and the language profile), the user's revision feedback, a request to call group_verify, " +
+			"or a reason to stop (the group awaits the user's review, or it failed). Resumes an interrupted task.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
+		n, err := as(a, req).TaskNext(ctx, in.Feature)
+		return text(app.FormatNext(n), err)
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "task_done",
+		Description: "Implementation: report the current task as finished. sdd runs the build command in the worktree; if it passes it commits a " +
+			"checkpoint and marks the task done, otherwise the task stays in progress and the build output is returned.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in taskDoneArgs) (*mcp.CallToolResult, any, error) {
+		d, err := as(a, req).TaskDone(ctx, in.Feature, in.Summary)
+		if err == nil && !d.Passed {
+			return failure(app.FormatDone(d))
+		}
+		return text(app.FormatDone(d), err)
+	})
+
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "group_verify",
+		Description: "Implementation: once every task of the group is done (or the user's feedback is addressed), run build, lint and test in the " +
+			"worktree. On success sdd squashes the group into one commit and the group waits for the user's review: stop then. On failure fix and call it again.",
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
+		v, err := as(a, req).GroupVerify(ctx, in.Feature)
+		if err == nil && !v.Passed {
+			return failure(app.FormatVerified(v))
+		}
+		return text(app.FormatVerified(v), err)
+	})
 	return s
+}
+
+type taskDoneArgs struct {
+	Feature string `json:"feature" jsonschema:"the feature being implemented"`
+	Summary string `json:"summary,omitempty" jsonschema:"one line on what the task changed, shown to the user in the review"`
 }
 
 type featureArg struct {
@@ -121,7 +159,7 @@ type requiredFeatureArg struct {
 }
 
 type guideArgs struct {
-	Topic   string `json:"topic" jsonschema:"workflow, functional, technical or plan"`
+	Topic   string `json:"topic" jsonschema:"workflow, functional, technical, plan or implement"`
 	Feature string `json:"feature,omitempty" jsonschema:"a feature whose current status to include"`
 }
 
@@ -144,6 +182,11 @@ func text(s string, err error) (*mcp.CallToolResult, any, error) {
 		return nil, nil, err
 	}
 	return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: s}}}, nil, nil
+}
+
+// failure returns a tool error carrying s (a verification that did not pass).
+func failure(s string) (*mcp.CallToolResult, any, error) {
+	return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: s}}}, nil, nil
 }
 
 // as returns a copy of the app that journals state changes as the calling agent.

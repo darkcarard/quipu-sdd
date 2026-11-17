@@ -16,7 +16,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M2 (Claude provider): parked.** Built and tested (`internal/provider/...`, `internal/transcript`) for an agent loop inside `sdd`, then set aside when `sdd` moved to running inside the user's agent. Kept for a possible future API mode; nothing imports it from the CLI.
 - **M3 (agent integration + Specify): done.** `sdd mcp` (stdio, official Go SDK) with `status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check`, `trace`; `sdd guide`; `sdd init --agent claude|generic` and `--check` (never modifies existing files; ephemeral paths in `.sdd/.gitignore`); Claude Code skills `/sdd-spec`, `/sdd-tech`; agents journaled as `agent:<client>` and unable to approve (`feature.ErrHumanOnly`); commands find the project root from any subdirectory.
 - **M4 (Plan): done.** `guide plan` with a coverage checklist built from the approved specs (IDs with their components/test levels, file limit, Architecture, language), `/sdd-plan` skill, plan layer check against the technical Architecture (`plan.CheckLayers`, warning). Next-step texts point to the agent commands and say approvals are the user's.
-- **Next: M5.** Implement: worktrees, `sdd implement`, `task_next`/`task_done`/`group_verify` (MCP + CLI), verification, WIP checkpoints squashed into group commits with trailers, `review`/`approve`/`revise`/`resume`/`clean`, `/sdd-implement`. Brownfield adoption is M7.
+- **M5 (Implement): done.** `internal/workspace` (git CLI: worktree ensure/repair, checkpoints, squash with trailers, diff, reset, log), `internal/verify` (technical-spec commands with timeout, process-group kill, output tail), `internal/implement` (group/task state machine: `Start`, `TaskNext`, `TaskDone`, `GroupVerify`, `ReviewGroup`, `ApproveGroup`, `ReviseGroup`, `Resume`, `Clean`). CLI `implement`, `task next|done`, `group verify`, `review`, `approve`, `revise`, `resume`, `clean`; MCP `task_next`, `task_done`, `group_verify`; `/sdd-implement`; `guide implement`. After an approval the agent's `task_next` starts the next group. `FindRoot` maps a worktree to its owning project.
+- **Next: M6.** Validate: `sdd validate`, plan↔code sync (group commits and trailers, `covers: AC-###` in tests), full `trace` with commits and tests, `report.md`, `review_context` and `/sdd-deep-review`. Brownfield adoption is M7.
 
 Update this section whenever a milestone is completed.
 
@@ -49,6 +50,7 @@ make install # go install with version ldflags
 - `internal/app`: use cases shared by the CLI and the MCP server (results as structs, text formatters, `guide` with the embedded agent guides in `app/guides/`)
 - `internal/mcpserver`: `sdd mcp`; human-only operations are never registered as tools
 - `internal/agents`: integration files per agent (`files/claude`, `files/generic`) and the never-overwrite installer
+- `internal/implement`, `internal/workspace`, `internal/verify`: Phase 3 (see M5 above)
 - `internal/config`: configuration (`sdd.yaml` plus `.env` and environment variables)
 - `internal/workflow`: phases, transitions, `Evaluate` (staleness), `Effective` (derived phase)
 - `internal/state`: `Layout` paths, atomic writes, `FeatureState`
@@ -62,5 +64,4 @@ make install # go install with version ldflags
 - `internal/trace`: ID index over specs and plan, tree rendering and matrix
 - `internal/feature`: use cases on one feature (load, lint, sync, create from template, approve, next action); the CLI and later the orchestrator call it
 - `internal/sddtest`: a valid fixture feature shared by tests
-- `internal/workspace`: worktree and commit interfaces (implemented in M5)
 - Parked for API mode (unused): `internal/provider` (+ `anthropic`, `registry`), `internal/transcript`, `internal/tools`, `internal/orchestrator`

@@ -140,16 +140,25 @@ type GroupState struct {
 	Status    workflow.GroupStatus `json:"status"`
 	BaseSHA   string               `json:"base_sha,omitempty"`   // HEAD before the group started (squash base)
 	CommitSHA string               `json:"commit_sha,omitempty"` // squashed group commit
-	Attempts  int                  `json:"attempts,omitempty"`   // verification fix attempts
+	Attempts  int                  `json:"attempts,omitempty"`   // failed verifications since the last success or revision
 	Tasks     []TaskState          `json:"tasks,omitempty"`
+	// Feedback is the user's latest `sdd revise` message, until verification passes again.
+	Feedback  string `json:"feedback,omitempty"`
+	Revisions int    `json:"revisions,omitempty"`
+	// Verification is the summary of the latest group verification.
+	Verification string `json:"verification,omitempty"`
 }
 
 // TaskState tracks one plan task.
 type TaskState struct {
 	ID            string              `json:"id"`
 	Status        workflow.TaskStatus `json:"status"`
-	Attempts      int                 `json:"attempts,omitempty"`
+	Attempts      int                 `json:"attempts,omitempty"`       // failed task_done builds
 	CheckpointSHA string              `json:"checkpoint_sha,omitempty"` // WIP commit
+	// Summary is what the agent reported when it finished the task.
+	Summary string `json:"summary,omitempty"`
+	// Undeclared lists changed files the plan did not declare for the task.
+	Undeclared []string `json:"undeclared,omitempty"`
 }
 
 // NewFeatureState returns the initial state of a new feature.

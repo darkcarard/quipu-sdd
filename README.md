@@ -11,7 +11,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M4 done.** Specs and the plan are drafted with Claude Code through the `sdd` MCP server and the `/sdd-spec`, `/sdd-tech` and `/sdd-plan` commands, and linted, approved, synced and traced by `sdd`. Implementation with the agent arrives in M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M5 done.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-spec`, `/sdd-tech`, `/sdd-plan` and `/sdd-implement` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, and stops for your review after each group. Validation arrives in M6. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -36,6 +36,10 @@ sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and the Claude Code setup
 ! sdd spec approve user-signup --functional   # you approve (agents cannot)
 /sdd-tech user-signup                  # the agent drafts the technical spec
 /sdd-plan user-signup                  # then the plan (approve each one as above)
+! sdd implement user-signup            # creates the worktree .sdd/worktrees/user-signup
+/sdd-implement user-signup             # the agent implements the first group, task by task
+! sdd review user-signup               # you review the group's commit
+! sdd approve user-signup              # or: sdd revise user-signup -m "..."
 ```
 
 `sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths:

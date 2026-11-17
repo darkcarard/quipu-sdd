@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/state"
 	"github.com/darkcarard/sdd-framework/internal/templates"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/sdd-framework/internal/workspace"
 )
 
 // connect starts the server for a fresh project and returns a client session
@@ -221,6 +223,75 @@ func TestPlanningThroughMCP(t *testing.T) {
 	}
 }
 
+// TestImplementationThroughMCP checks that a failed verification reaches the
+// agent as a tool error and that the review gate stops it.
+func TestImplementationThroughMCP(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("verification commands use sh")
+	}
+	cs, a := connect(t)
+	ctx := context.Background()
+	g := workspace.Git{Dir: a.Root}
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.name", "Ada"},
+		{"config", "user.email", "ada@example.com"}, {"config", "commit.gpgsign", "false"}} {
+		if _, err := g.Run(ctx, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	human := feature.Identity{Name: "Ada", Email: "ada@example.com"}
+	a.Who = func(context.Context) (feature.Identity, error) { return human, nil }
+	dir := a.Layout.SpecDir("user-signup")
+	os.MkdirAll(dir, 0o755)
+	tech := sddtest.Technical
+	i, j := strings.Index(tech, "  build:"), strings.Index(tech, "---\n\n#")
+	tech = tech[:i] + "  build: \"true\"\n  lint: \"true\"\n  test: test ! -f TEST_FAIL\n  integration: \"true\"\n" + tech[j:]
+	for name, content := range map[string]string{"functional.md": sddtest.Functional, "technical.md": tech, "plan.md": sddtest.Plan} {
+		os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644)
+	}
+	for _, art := range workflow.Artifacts() {
+		if _, err := a.Approve(ctx, "user-signup", art); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g.Run(ctx, "add", ".")
+	g.Run(ctx, "commit", "-q", "-m", "specs")
+	if _, err := a.StartImplement(ctx, "user-signup"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, isErr := call(t, cs, "task_next", map[string]any{"feature": "user-signup"})
+	if isErr || !strings.Contains(out, "Task T1.1: User entity") {
+		t.Fatalf("task_next: %v %s", isErr, out)
+	}
+	wt := a.Layout.WorktreeDir("user-signup")
+	os.MkdirAll(filepath.Join(wt, "internal", "signup"), 0o755)
+	os.WriteFile(filepath.Join(wt, "internal", "signup", "user.go"), []byte("package signup\n"), 0o644)
+	if out, isErr := call(t, cs, "task_done", map[string]any{"feature": "user-signup", "summary": "entity"}); isErr || !strings.Contains(out, "T1.1 done") {
+		t.Fatalf("task_done: %v %s", isErr, out)
+	}
+	os.WriteFile(filepath.Join(wt, "TEST_FAIL"), []byte("x"), 0o644)
+	if out, isErr := call(t, cs, "group_verify", map[string]any{"feature": "user-signup"}); !isErr || !strings.Contains(out, "test:       FAILED") {
+		t.Errorf("a failed verification must be a tool error: %v %s", isErr, out)
+	}
+	os.Remove(filepath.Join(wt, "TEST_FAIL"))
+	if out, isErr := call(t, cs, "group_verify", map[string]any{"feature": "user-signup"}); isErr || !strings.Contains(out, "stop: G1 is committed") {
+		t.Fatalf("group_verify: %v %s", isErr, out)
+	}
+	if out, _ := call(t, cs, "task_next", map[string]any{"feature": "user-signup"}); !strings.Contains(out, "G1 awaits the user's review: stop") {
+		t.Errorf("review gate: %s", out)
+	}
+	events, _ := journal.Read(a.Layout.JournalFile("user-signup"))
+	agentEvents := 0
+	for _, ev := range events {
+		if ev.Actor == "agent:claude-code" && (ev.Action == "task.verify" || ev.Action == "group.verify") {
+			agentEvents++
+		}
+	}
+	if agentEvents < 4 {
+		t.Errorf("the agent's verifications must be journaled as agent:claude-code (%d found)", agentEvents)
+	}
+}
+
 func TestToolErrorsReachTheAgent(t *testing.T) {
 	cs, _ := connect(t)
 	tests := []struct {
@@ -231,7 +302,7 @@ func TestToolErrorsReachTheAgent(t *testing.T) {
 		{"spec_new", map[string]any{}, "pass text"},
 		{"spec_new", map[string]any{"text": "x", "technical": true}, "feature not found"},
 		{"plan_new", map[string]any{"feature": "nope"}, "feature not found"},
-		{"guide", map[string]any{"topic": "implement"}, "M5"},
+		{"task_next", map[string]any{"feature": "nope"}, "feature not found"},
 		{"guide", map[string]any{"topic": "poetry"}, "unknown guide topic"},
 		{"trace", map[string]any{"id": "bogus"}, "not a traceable ID"},
 	}

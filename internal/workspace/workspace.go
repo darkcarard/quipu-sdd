@@ -1,18 +1,20 @@
 // Package workspace manages the isolated git worktree in which a feature is
-// implemented (.sdd/worktrees/<feature>, branch sdd/<feature>), including WIP
-// checkpoint commits and the per-group squash with SDD trailers. Git operations
-// are implemented in M5; trailer formatting is final.
+// implemented (.sdd/worktrees/<feature>, branch sdd/<feature>): creating and
+// repairing it, WIP checkpoint commits, the per-group squash with SDD
+// trailers, diffs and resets. It drives the git CLI.
 package workspace
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 )
-
-// ErrNotImplemented is returned by operations scheduled for a later milestone.
-var ErrNotImplemented = errors.New("workspace: not implemented")
 
 // Trailers are the SDD commit trailers that link a commit to the spec chain.
 type Trailers struct {
@@ -44,43 +46,224 @@ func CommitMessage(subject string, t Trailers) string {
 	return strings.TrimSpace(subject) + "\n\n" + t.String()
 }
 
-// Workspace is the git worktree contract used by the orchestrator.
-type Workspace interface {
-	// Ensure creates the worktree for feature (or repairs a missing one) and returns its path.
-	Ensure(ctx context.Context, feature string) (string, error)
-	// Head returns the current commit SHA of the worktree.
-	Head(ctx context.Context) (string, error)
-	// Dirty reports whether the worktree has uncommitted changes.
-	Dirty(ctx context.Context) (bool, error)
-	// Checkpoint commits all changes as a WIP commit and returns its SHA.
-	Checkpoint(ctx context.Context, message string) (string, error)
-	// SquashGroup squashes everything since base into one commit and returns its SHA.
-	SquashGroup(ctx context.Context, base, subject string, t Trailers) (string, error)
-	// ResetTo discards changes and moves the branch to sha (used by `sdd resume --discard`).
-	ResetTo(ctx context.Context, sha string) error
-	// Remove deletes the worktree (`sdd clean`).
-	Remove(ctx context.Context) error
+// Branch returns the private branch of a feature.
+func Branch(feature string) string { return "sdd/" + feature }
+
+// Git runs git commands in Dir.
+type Git struct{ Dir string }
+
+// Run executes git with args and returns its trimmed stdout.
+func (g Git) Run(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = g.Dir
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "LC_ALL=C")
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(errb.String())
+		if msg == "" {
+			msg = strings.TrimSpace(out.String())
+		}
+		return "", fmt.Errorf("git %s: %s: %w", strings.Join(args, " "), msg, err)
+	}
+	return strings.TrimRight(out.String(), "\n"), nil
 }
 
-// Git is the git-CLI implementation of Workspace.
-type Git struct {
-	RepoRoot     string // main repository root
-	WorktreesDir string // .sdd/worktrees
-	dir          string // active worktree path
+// Worktree is a feature's worktree.
+type Worktree struct {
+	Dir    string
+	Branch string
+	git    Git
 }
 
-var _ Workspace = (*Git)(nil)
+// ErrNoCommits is returned when the repository has no commit to branch from.
+var ErrNoCommits = errors.New("the repository has no commits yet: commit your project (including specs/ and sdd.yaml) before `sdd implement`")
 
-func (g *Git) Ensure(ctx context.Context, feature string) (string, error) {
-	return "", ErrNotImplemented
+// Open returns the worktree at dir without checking it.
+func Open(dir, branch string) *Worktree {
+	return &Worktree{Dir: dir, Branch: branch, git: Git{Dir: dir}}
 }
-func (g *Git) Head(ctx context.Context) (string, error) { return "", ErrNotImplemented }
-func (g *Git) Dirty(ctx context.Context) (bool, error)  { return false, ErrNotImplemented }
-func (g *Git) Checkpoint(ctx context.Context, message string) (string, error) {
-	return "", ErrNotImplemented
+
+// Ensure creates the worktree of feature at dir on its branch, or repairs it:
+// an existing healthy worktree is reused, a missing one is recreated from the
+// branch (or, the first time, from the repository's HEAD). It reports whether
+// the worktree was (re)created.
+func Ensure(ctx context.Context, repoRoot, dir, feature string) (*Worktree, bool, error) {
+	repo := Git{Dir: repoRoot}
+	branch := Branch(feature)
+	wt := Open(dir, branch)
+	if top, err := wt.git.Run(ctx, "rev-parse", "--show-toplevel"); err == nil && sameDir(top, dir) {
+		cur, err := wt.git.Run(ctx, "symbolic-ref", "--short", "HEAD")
+		if err != nil || cur != branch {
+			return nil, false, fmt.Errorf("worktree %s is not on branch %s (found %q): fix it or remove it with `sdd clean`", dir, branch, cur)
+		}
+		return wt, false, nil
+	}
+	if _, err := repo.Run(ctx, "rev-parse", "--verify", "--quiet", "HEAD^{commit}"); err != nil {
+		if _, gerr := repo.Run(ctx, "rev-parse", "--git-dir"); gerr != nil {
+			return nil, false, fmt.Errorf("%s is not a git repository: run `git init` and commit your project first", repoRoot)
+		}
+		return nil, false, ErrNoCommits
+	}
+	_, _ = repo.Run(ctx, "worktree", "prune") // forget worktrees whose directory is gone
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+		return nil, false, err
+	}
+	var err error
+	if _, berr := repo.Run(ctx, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); berr == nil {
+		_, err = repo.Run(ctx, "worktree", "add", dir, branch)
+	} else {
+		_, err = repo.Run(ctx, "worktree", "add", "-b", branch, dir, "HEAD")
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return wt, true, nil
 }
-func (g *Git) SquashGroup(ctx context.Context, base, subject string, t Trailers) (string, error) {
-	return "", ErrNotImplemented
+
+func sameDir(a, b string) bool {
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	return err1 == nil && err2 == nil && filepath.Clean(ra) == filepath.Clean(rb)
 }
-func (g *Git) ResetTo(ctx context.Context, sha string) error { return ErrNotImplemented }
-func (g *Git) Remove(ctx context.Context) error              { return ErrNotImplemented }
+
+// Exists reports whether the worktree directory exists.
+func (w *Worktree) Exists() bool {
+	_, err := os.Stat(w.Dir)
+	return err == nil
+}
+
+// Head returns the SHA of the worktree's HEAD.
+func (w *Worktree) Head(ctx context.Context) (string, error) {
+	return w.git.Run(ctx, "rev-parse", "HEAD")
+}
+
+// Changed returns the files with uncommitted changes (modified, added,
+// deleted or untracked), relative to the worktree root, sorted.
+func (w *Worktree) Changed(ctx context.Context) ([]string, error) {
+	out, err := w.git.Run(ctx, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	entries := strings.Split(out, "\x00")
+	for i := 0; i < len(entries); i++ {
+		e := entries[i]
+		if len(e) < 4 {
+			continue
+		}
+		status, path := e[:2], e[3:]
+		if status[0] == 'R' || status[0] == 'C' { // rename/copy: the source path follows
+			i++
+		}
+		files = append(files, path)
+	}
+	sort.Strings(files)
+	return files, nil
+}
+
+// Checkpoint stages every change and commits it; it returns the new HEAD.
+// With no changes it makes no commit and returns the current HEAD.
+func (w *Worktree) Checkpoint(ctx context.Context, message string) (string, error) {
+	changed, err := w.Changed(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(changed) == 0 {
+		return w.Head(ctx)
+	}
+	if _, err := w.git.Run(ctx, "add", "--all"); err != nil {
+		return "", err
+	}
+	if _, err := w.git.Run(ctx, "commit", "--quiet", "--no-verify", "-m", message); err != nil {
+		return "", err
+	}
+	return w.Head(ctx)
+}
+
+// Squash stages every change, then replaces all commits after base with one
+// commit carrying message, and returns its SHA.
+func (w *Worktree) Squash(ctx context.Context, base, message string) (string, error) {
+	if _, err := w.git.Run(ctx, "add", "--all"); err != nil {
+		return "", err
+	}
+	if _, err := w.git.Run(ctx, "reset", "--soft", base); err != nil {
+		return "", err
+	}
+	if _, err := w.git.Run(ctx, "commit", "--quiet", "--no-verify", "--allow-empty", "-m", message); err != nil {
+		return "", err
+	}
+	return w.Head(ctx)
+}
+
+// DiffStat summarizes the changes from base to the working tree.
+func (w *Worktree) DiffStat(ctx context.Context, base string) (string, error) {
+	if _, err := w.git.Run(ctx, "add", "--all", "--intent-to-add"); err != nil {
+		return "", err
+	}
+	return w.git.Run(ctx, "diff", "--stat", base)
+}
+
+// Diff returns the full diff from base to the working tree.
+func (w *Worktree) Diff(ctx context.Context, base string) (string, error) {
+	if _, err := w.git.Run(ctx, "add", "--all", "--intent-to-add"); err != nil {
+		return "", err
+	}
+	return w.git.Run(ctx, "diff", base)
+}
+
+// Reset discards every uncommitted change and moves the branch to sha.
+func (w *Worktree) Reset(ctx context.Context, sha string) error {
+	if _, err := w.git.Run(ctx, "reset", "--hard", sha); err != nil {
+		return err
+	}
+	_, err := w.git.Run(ctx, "clean", "-fd")
+	return err
+}
+
+// Remove deletes the worktree directory; the branch is kept.
+func Remove(ctx context.Context, repoRoot, dir string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	_, err := Git{Dir: repoRoot}.Run(ctx, append(args, dir)...)
+	return err
+}
+
+// Commit is one commit of the branch with its SDD trailers.
+type Commit struct {
+	SHA      string
+	Subject  string
+	Trailers map[string]string
+}
+
+// Log returns the commits reachable from HEAD but not from base, newest first.
+func (w *Worktree) Log(ctx context.Context, base string) ([]Commit, error) {
+	const sep = "\x1e"
+	out, err := w.git.Run(ctx, "log", "--format=%H%x1f%s%x1f%(trailers:only,unfold)"+sep, base+"..HEAD")
+	if err != nil {
+		return nil, err
+	}
+	var commits []Commit
+	for _, rec := range strings.Split(out, sep) {
+		rec = strings.Trim(rec, "\n")
+		if rec == "" {
+			continue
+		}
+		parts := strings.SplitN(rec, "\x1f", 3)
+		c := Commit{SHA: parts[0], Trailers: map[string]string{}}
+		if len(parts) > 1 {
+			c.Subject = parts[1]
+		}
+		if len(parts) > 2 {
+			for _, line := range strings.Split(parts[2], "\n") {
+				if k, v, ok := strings.Cut(line, ": "); ok {
+					c.Trailers[k] = strings.TrimSpace(v)
+				}
+			}
+		}
+		commits = append(commits, c)
+	}
+	return commits, nil
+}

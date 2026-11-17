@@ -304,6 +304,24 @@ func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (dia
 	return ds, f.RenderLog()
 }
 
+// Record appends an event to the journal and regenerates log.md.
+func (f *Feature) Record(ev journal.Event) error { return f.record(ev) }
+
+// SaveState writes state.json with the current state.
+func (f *Feature) SaveState() error {
+	if err := f.Layout.Save(f.State); err != nil {
+		return err
+	}
+	f.Saved = true
+	return nil
+}
+
+// SetPhase records a new stored phase and recomputes the effective one.
+func (f *Feature) SetPhase(p workflow.Phase) {
+	f.State.Phase = p
+	f.Phase = workflow.Effective(p, f.Statuses)
+}
+
 // record appends an event to the journal and regenerates log.md.
 func (f *Feature) record(ev journal.Event) error {
 	jr, err := f.Journal()

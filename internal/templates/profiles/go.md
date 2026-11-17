@@ -9,7 +9,7 @@ commands:
 
 # Go Best-Practice Profile
 
-This profile is injected into the agent's system prompt during the Implement phase for projects whose technical spec declares `language: go`.
+sdd hands this profile to the agent with every task of the Implement phase, for projects whose technical spec declares `language: go`.
 
 ## Code
 - Format with `gofmt` and organize imports with `goimports`. Code that is not gofmt-clean is not done.

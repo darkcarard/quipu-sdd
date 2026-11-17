@@ -9,11 +9,12 @@ If your agent supports MCP, register the `sdd` server: it runs over stdio with t
 | Purpose | Command |
 |---|---|
 | Phase and next step | `sdd status [<feature>]` |
-| Drafting instructions and template | `sdd guide functional\|technical\|plan [--feature <feature>]` |
+| Drafting instructions and template | `sdd guide functional\|technical\|plan\|implement [--feature <feature>]` |
 | Create a feature / its technical spec | `sdd spec new "<feature or description>"` / `sdd spec new <feature> --technical` |
 | Create the plan | `sdd plan new <feature>` |
 | Lint | `sdd spec lint [<feature>]` |
 | Consistency between artifacts | `sdd sync check [<feature>]` |
 | Follow an ID | `sdd trace <ID>` |
+| Implementation: next step / finish a task / verify the group | `sdd task next <feature>` / `sdd task done <feature> --summary "…"` / `sdd group verify <feature>` |
 
-The user runs the approvals: `sdd spec approve <feature> --functional|--technical` and `sdd plan approve <feature>`.
+The user runs the approvals and reviews: `sdd spec approve <feature> --functional|--technical`, `sdd plan approve <feature>`, `sdd implement <feature>`, `sdd review`, `sdd approve`, `sdd revise`, `sdd resume` and `sdd clean`.
