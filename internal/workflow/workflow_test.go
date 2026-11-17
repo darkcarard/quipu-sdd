@@ -136,3 +136,27 @@ func TestEffective(t *testing.T) {
 		})
 	}
 }
+
+func TestEffectiveBaseline(t *testing.T) {
+	ap, dr, mi, mo := StatusApproved, StatusDraft, StatusMissing, StatusModified
+	tests := []struct {
+		name    string
+		f, t, p ArtifactStatus
+		want    Phase
+	}{
+		{"documenting behavior", dr, mi, mi, FunctionalDrafting},
+		{"behavior approved", ap, mi, mi, FunctionalApproved},
+		{"documenting design", ap, dr, mi, TechnicalDrafting},
+		{"both approved", ap, ap, mi, Baselined},
+		{"revised baseline reopens", mo, ap, mi, FunctionalDrafting},
+	}
+	for _, tt := range tests {
+		got := EffectiveFor(Baselined, map[Artifact]ArtifactStatus{Functional: tt.f, Technical: tt.t, Plan: tt.p}, true)
+		if got != tt.want {
+			t.Errorf("%s: %s, want %s", tt.name, got, tt.want)
+		}
+	}
+	if got := EffectiveFor(TechnicalApproved, map[Artifact]ArtifactStatus{Functional: ap, Technical: ap, Plan: mi}, false); got != TechnicalApproved {
+		t.Errorf("a regular feature is not baselined: %s", got)
+	}
+}

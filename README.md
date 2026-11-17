@@ -11,7 +11,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M6 done: the full greenfield workflow.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-*` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Next: adopting existing projects (M7). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M6 done: the full greenfield workflow.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-*` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Existing projects are adopted with `/sdd-adopt`, which documents the current code as baseline specs without changing it. Next: integrations for more agents (M8). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 

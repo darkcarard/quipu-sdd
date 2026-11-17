@@ -81,6 +81,8 @@ type Meta struct {
 	Status    string   `yaml:"status"`
 	Version   int      `yaml:"version"`
 	DependsOn []string `yaml:"depends_on"`
+	// Origin is "existing" for a baseline feature, which documents code that already exists.
+	Origin string `yaml:"origin,omitempty"`
 }
 
 // Heading is a level-2 section heading.

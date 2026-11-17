@@ -259,3 +259,69 @@ func TestAgentsCannotApprove(t *testing.T) {
 		t.Errorf("Actor = %s", got)
 	}
 }
+
+func TestBaselineFeature(t *testing.T) {
+	l := setup(t)
+	f, _ := Open(l, config.Default(), sddtest.Feature)
+	path, err := f.Create(workflow.Functional, Info{Baseline: true}, who, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); !strings.Contains(string(b), `origin: "existing"`) {
+		t.Errorf("the functional spec must be marked as existing:\n%s", b)
+	}
+	if f := load(t, l); !f.Baseline() || f.State.Origin != OriginExisting || !strings.Contains(f.Next(), "/sdd-adopt") {
+		t.Errorf("baseline = %v, origin %q, next %q", f.Baseline(), f.State.Origin, f.Next())
+	}
+
+	baseline := strings.Replace(sddtest.Functional, "depends_on: []", "depends_on: []\norigin: existing", 1)
+	write(t, l, workflow.Functional, baseline)
+	approve(t, l, workflow.Functional)
+	write(t, l, workflow.Technical, sddtest.Technical)
+	f = approve(t, l, workflow.Technical)
+	if f.Phase != workflow.Baselined || !strings.Contains(f.Next(), "depends_on: [user-signup]") {
+		t.Fatalf("phase %s, next %q", f.Phase, f.Next())
+	}
+	if _, err := f.Create(workflow.Plan, Info{}, who, now); !errors.Is(err, ErrBaselinePlan) {
+		t.Errorf("a baseline has no plan: %v", err)
+	}
+	write(t, l, workflow.Plan, sddtest.Plan)
+	if _, err := load(t, l).Approve(workflow.Plan, who, now); !errors.Is(err, ErrBaselinePlan) {
+		t.Errorf("approving a plan for a baseline: %v", err)
+	}
+	if ds := load(t, l).Sync(); !ds.HasErrors() {
+		t.Error("a plan.md in a baseline must be reported")
+	}
+	os.Remove(filepath.Join(l.SpecDir(sddtest.Feature), "plan.md"))
+
+	// Revising the baseline reopens it until both specs are re-approved.
+	write(t, l, workflow.Functional, strings.Replace(baseline, "p95 < 300 ms", "p95 < 200 ms", 1))
+	if f := load(t, l); f.Phase != workflow.FunctionalDrafting {
+		t.Errorf("revised baseline phase = %s", f.Phase)
+	}
+	approve(t, l, workflow.Functional)
+	if f := approve(t, l, workflow.Technical); f.Phase != workflow.Baselined {
+		t.Errorf("re-approved baseline phase = %s", f.Phase)
+	}
+
+	// A feature that depends on it is told when the baseline is not approved.
+	g, _ := Open(l, config.Default(), "checkout")
+	g.Create(workflow.Functional, Info{}, who, now)
+	dep := strings.Replace(strings.Replace(sddtest.Functional, "depends_on: []", "depends_on: [user-signup]", 1), "id: user-signup", "id: checkout", 1)
+	os.WriteFile(filepath.Join(l.SpecDir("checkout"), "functional.md"), []byte(dep), 0o644)
+	ck, _ := Load(l, config.Default(), "checkout")
+	for _, d := range ck.Sync() {
+		if strings.Contains(d.Message, "depends_on") {
+			t.Errorf("an approved baseline dependency is fine: %v", d)
+		}
+	}
+	write(t, l, workflow.Functional, baseline+"\n") // edit the baseline again
+	ck, _ = Load(l, config.Default(), "checkout")
+	found := false
+	for _, d := range ck.Sync() {
+		found = found || strings.Contains(d.Message, `baseline "user-signup" is not approved yet`)
+	}
+	if !found {
+		t.Errorf("an unapproved baseline dependency must be reported: %v", ck.Sync())
+	}
+}

@@ -15,6 +15,7 @@ If your agent supports MCP, register the `sdd` server: it runs over stdio with t
 | Lint | `sdd spec lint [<feature>]` |
 | Consistency between artifacts | `sdd sync check [<feature>]` |
 | Follow an ID | `sdd trace <ID>` |
+| Adopt existing code as baseline specs | `sdd adopt --context`, `sdd guide adopt`, `sdd spec new <feature> --baseline` |
 | Implementation: next step / finish a task / verify the group | `sdd task next <feature>` / `sdd task done <feature> --summary "…"` / `sdd group verify <feature>` |
 
 The user runs the approvals and reviews: `sdd spec approve <feature> --functional|--technical`, `sdd plan approve <feature>`, `sdd implement <feature>`, `sdd review`, `sdd approve`, `sdd revise`, `sdd resume` and `sdd clean`.

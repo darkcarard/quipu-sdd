@@ -115,6 +115,8 @@ type FeatureState struct {
 	Description string    `json:"description,omitempty"`
 	CreatedAt   time.Time `json:"created_at,omitempty"`
 	CreatedBy   string    `json:"created_by,omitempty"`
+	// Origin is "existing" for a baseline feature (adopted code, no plan).
+	Origin string `json:"origin,omitempty"`
 
 	Phase     workflow.Phase                          `json:"phase"`
 	Approvals map[workflow.Artifact]workflow.Approval `json:"approvals,omitempty"`

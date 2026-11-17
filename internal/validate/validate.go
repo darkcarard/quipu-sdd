@@ -232,6 +232,23 @@ func Index(ctx context.Context, f *feature.Feature) (*trace.Index, diag.List, er
 		Technical:  f.Files[workflow.Technical].Rel,
 		Plan:       f.Files[workflow.Plan].Rel,
 	}, f.Functional, f.Technical, f.Plan)
+	if f.Baseline() {
+		// Existing code: link the tests that already reference the baseline's
+		// IDs, without requiring any.
+		ix.MarkBaseline()
+		refs, err := ScanTests(ctx, f.Layout.Root)
+		if err != nil {
+			return ix, nil, err
+		}
+		tests := map[string][]string{}
+		for _, r := range refs {
+			for _, id := range r.IDs {
+				tests[id] = append(tests[id], fmt.Sprintf("%s:%d", r.File, r.Line))
+			}
+		}
+		ix.Link(trace.Links{Tests: tests})
+		return ix, nil, nil
+	}
 	if !started(f) {
 		return ix, nil, nil
 	}

@@ -12,4 +12,4 @@ How to work:
 - Do not edit `sdd.yaml` or anything under `.sdd/` (state, journal, templates) unless the user asks.
 - Feature IDs (`FR-001`, `AC-001`, …) are permanent: never renumber or delete them; retire them instead (see the guides).
 
-Phases: functional spec → technical spec → plan → implementation → validation. `status` always tells you the phase of a feature and the next step.
+Phases: functional spec → technical spec → plan → implementation → validation. `status` always tells you the phase of a feature and the next step. Existing code is first documented as baseline features (`guide adopt`); new features build on them with `depends_on`.

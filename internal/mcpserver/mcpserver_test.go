@@ -295,6 +295,28 @@ func TestImplementationThroughMCP(t *testing.T) {
 	}
 }
 
+func TestAdoptionThroughMCP(t *testing.T) {
+	cs, a := connect(t)
+	os.WriteFile(filepath.Join(a.Root, "go.mod"), []byte("module example.com/x\n"), 0o644)
+	out, isErr := call(t, cs, "adopt_context", nil)
+	if isErr || !strings.Contains(out, "From go.mod") || !strings.Contains(out, "guide adopt") {
+		t.Fatalf("adopt_context: %v %s", isErr, out)
+	}
+	out, isErr = call(t, cs, "spec_new", map[string]any{"text": "Core platform", "baseline": true})
+	if isErr || !strings.Contains(out, "feature  core-platform") {
+		t.Fatalf("spec_new baseline: %v %s", isErr, out)
+	}
+	if f, err := a.Load("core-platform"); err != nil || !f.Baseline() {
+		t.Errorf("baseline not recorded: %v", err)
+	}
+	if out, _ := call(t, cs, "adopt_context", nil); !strings.Contains(out, "- core-platform (baseline): functional-drafting") {
+		t.Errorf("adopt_context features: %s", out)
+	}
+	if out, isErr := call(t, cs, "guide", map[string]any{"topic": "adopt"}); isErr || !strings.Contains(out, "baseline features") {
+		t.Errorf("guide adopt: %v %s", isErr, out)
+	}
+}
+
 func TestToolErrorsReachTheAgent(t *testing.T) {
 	cs, _ := connect(t)
 	tests := []struct {

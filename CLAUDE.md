@@ -19,7 +19,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M5 (Implement): done.** `internal/workspace` (git CLI: worktree ensure/repair, checkpoints, squash with trailers, diff, reset, log), `internal/verify` (technical-spec commands with timeout, process-group kill, output tail), `internal/implement` (group/task state machine: `Start`, `TaskNext`, `TaskDone`, `GroupVerify`, `ReviewGroup`, `ApproveGroup`, `ReviseGroup`, `Resume`, `Clean`). CLI `implement`, `task next|done`, `group verify`, `review`, `approve`, `revise`, `resume`, `clean`; MCP `task_next`, `task_done`, `group_verify`; `/sdd-implement`; `guide implement`. After an approval the agent's `task_next` starts the next group. `FindRoot` maps a worktree to its owning project.
 - **M6 (Validate): done.** `internal/validate`: `CheckCode` (one commit per group with matching trailers on `sdd/<feature>`, commits without trailers, `covers:` references found with `git grep`, every AC of an approved group tested), `Index` (trace with commits and tests), `Validate` (integration in the worktree, all sync checks, `report.md`, phase `validated`), `ReviewContext`. CLI `validate`, `review --context`; `sync check` and `trace` include code; MCP `review_context`; `/sdd-deep-review`.
 - **Token economy of agent-facing output: done.** Profile sent once per group (and on resume), one-line rules in `task_next`, `limits.output_tail` (6000 chars) for failing command output, guides omit the template once the file exists, shorter MCP tool descriptions. Measured: later `task_next` ~700→~230 tokens, tool catalog ~1590→~1160, worst failure output ~4000→~1500.
-- **Next: M7.** Brownfield adoption (`adopt_context`, baseline features, `/sdd-adopt`). Also pending: the end-to-end test in a real Claude Code session.
+- **M7 (Brownfield adoption): done.** `internal/adopt` (deterministic, compact inventory: languages, build files, suggested commands, layout, tests, docs), baseline features (`origin: existing` in functional frontmatter and state; `workflow.EffectiveFor` → `baselined`; no plan: `feature.ErrBaselinePlan`), `sdd adopt --context` / MCP `adopt_context`, `spec new --baseline` / `spec_new baseline`, `guide adopt`, `/sdd-adopt`; trace shows baselines as existing code and links tests that reference them; sync warns about unapproved dependencies.
+- **Next: M8.** Integration files for Codex CLI and Gemini CLI. Also pending: the end-to-end test in a real Claude Code session.
 
 Update this section whenever a milestone is completed.
 
@@ -55,6 +56,7 @@ make install # go install with version ldflags
 - `internal/agents`: integration files per agent (`files/claude`, `files/generic`) and the never-overwrite installer
 - `internal/implement`, `internal/workspace`, `internal/verify`: Phase 3 (see M5 above)
 - `internal/validate`: Phase 4 (see M6 above)
+- `internal/adopt`: brownfield inventory (see M7 above)
 - `internal/config`: configuration (`sdd.yaml` plus `.env` and environment variables)
 - `internal/workflow`: phases, transitions, `Evaluate` (staleness), `Effective` (derived phase)
 - `internal/state`: `Layout` paths, atomic writes, `FeatureState`

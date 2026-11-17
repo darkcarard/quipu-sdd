@@ -48,7 +48,7 @@ func (a *App) runGuide(_ context.Context, args []string) error {
 		return err
 	}
 	if len(pos) != 1 {
-		return a.usageErr("sdd guide <workflow|functional|technical|plan|implement> [--feature <feature>]")
+		return a.usageErr("sdd guide <workflow|functional|technical|plan|implement|adopt> [--feature <feature>]")
 	}
 	if pos[0] == "workflow" && *feat == "" { // needs no project
 		fmt.Fprint(a.Stdout, app.WorkflowGuide())
@@ -85,7 +85,7 @@ func (a *App) runMCP(ctx context.Context, args []string) error {
 	return err
 }
 
-const specUsage = `sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"]
+const specUsage = `sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"] [--baseline]
        sdd spec new <feature> --technical
        sdd spec lint [<feature>]
        sdd spec approve <feature> --functional|--technical`
@@ -111,6 +111,7 @@ func (a *App) runSpec(ctx context.Context, args []string) error {
 func (a *App) runSpecNew(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("spec new")
 	technical := fs.Bool("technical", false, "create technical.md (requires an approved functional spec)")
+	baseline := fs.Bool("baseline", false, "create a baseline feature that documents existing code (no plan)")
 	name := fs.String("name", "", "feature name to use instead of the one derived from the argument")
 	title := fs.String("title", "", "human-readable title (default: the argument when it is free text)")
 	desc := fs.String("description", "", "one-line description, stored in state.json and the Summary")
@@ -121,7 +122,7 @@ func (a *App) runSpecNew(ctx context.Context, args []string) error {
 	if len(pos) > 1 || (len(pos) == 0 && *name == "") {
 		return a.usageErr(`sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"] [--technical]`)
 	}
-	in := app.NewSpecInput{Name: *name, Title: *title, Description: *desc, Technical: *technical}
+	in := app.NewSpecInput{Name: *name, Title: *title, Description: *desc, Technical: *technical, Baseline: *baseline}
 	if len(pos) == 1 {
 		in.Text = pos[0]
 	}
@@ -351,5 +352,26 @@ func (a *App) runTrace(_ context.Context, args []string) error {
 		return err
 	}
 	fmt.Fprint(a.Stdout, app.FormatTrace(entries))
+	return nil
+}
+
+func (a *App) runAdopt(ctx context.Context, args []string) error {
+	fs := a.newFlagSet("adopt")
+	fs.Bool("context", true, "print the project inventory for adoption (the default)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 0 {
+		return a.usageErr("sdd adopt [--context]")
+	}
+	p, err := a.open()
+	if err != nil {
+		return err
+	}
+	text, err := p.AdoptContext(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(a.Stdout, text)
 	return nil
 }

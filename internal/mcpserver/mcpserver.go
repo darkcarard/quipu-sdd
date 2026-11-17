@@ -19,7 +19,7 @@ import (
 const Name = "sdd"
 
 // Tools lists the tool names, in registration order.
-var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace", "task_next", "task_done", "group_verify", "review_context"}
+var Tools = []string{"status", "guide", "spec_new", "plan_new", "lint", "sync_check", "trace", "task_next", "task_done", "group_verify", "review_context", "adopt_context"}
 
 // Run serves the project over stdin/stdout until ctx is cancelled or the client disconnects.
 func Run(ctx context.Context, a *app.App) error {
@@ -48,7 +48,7 @@ func New(a *app.App) *mcp.Server {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "guide",
-		Description: "Drafting rules and template for a topic: workflow, functional, technical, plan (adds the coverage checklist) or implement. Pass the feature for its status. Call before drafting.",
+		Description: "Drafting rules and template for a topic: workflow, functional, technical, plan (adds the coverage checklist), implement or adopt. Pass the feature for its status. Call before drafting.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in guideArgs) (*mcp.CallToolResult, any, error) {
 		return text(a.Guide(in.Topic, in.Feature))
@@ -62,7 +62,7 @@ func New(a *app.App) *mcp.Server {
 			return nil, nil, errors.New("pass text (the feature name or its title) or name")
 		}
 		c, err := as(a, req).NewSpec(ctx, app.NewSpecInput{
-			Text: in.Text, Name: in.Name, Title: in.Title, Description: in.Description, Technical: in.Technical,
+			Text: in.Text, Name: in.Name, Title: in.Title, Description: in.Description, Technical: in.Technical, Baseline: in.Baseline,
 		})
 		return text(app.FormatCreated(c), err)
 	})
@@ -140,6 +140,13 @@ func New(a *app.App) *mcp.Server {
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
 		return text(a.ReviewContext(ctx, in.Feature))
 	})
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "adopt_context",
+		Description: "Adoption: inventory of an existing project (languages, build files, suggested commands, layout, tests, docs) to document it as baseline features.",
+		Annotations: readOnly,
+	}, func(ctx context.Context, req *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		return text(a.AdoptContext(ctx))
+	})
 	return s
 }
 
@@ -157,7 +164,7 @@ type requiredFeatureArg struct {
 }
 
 type guideArgs struct {
-	Topic   string `json:"topic" jsonschema:"workflow, functional, technical, plan or implement"`
+	Topic   string `json:"topic" jsonschema:"workflow, functional, technical, plan, implement or adopt"`
 	Feature string `json:"feature,omitempty" jsonschema:"feature whose status to include"`
 }
 
@@ -167,6 +174,7 @@ type specNewArgs struct {
 	Title       string `json:"title,omitempty" jsonschema:"title (default: the text)"`
 	Description string `json:"description,omitempty" jsonschema:"one-line description"`
 	Technical   bool   `json:"technical,omitempty" jsonschema:"create the technical spec instead"`
+	Baseline    bool   `json:"baseline,omitempty" jsonschema:"a baseline feature documenting existing code"`
 }
 
 type traceArgs struct {

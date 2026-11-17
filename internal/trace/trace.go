@@ -52,7 +52,8 @@ type Entry struct {
 	// Tests are the test references that cover the ID ("path:line").
 	Tests []string
 
-	linked bool
+	linked   bool
+	baseline bool
 }
 
 // Index holds every traced ID of one feature, in document order.
@@ -61,6 +62,17 @@ type Index struct {
 	entries []Entry
 	byID    map[string]int
 	linked  bool // Link was called: commits and tests are known
+	// baseline: the feature documents existing code (no plan, no group commits).
+	baseline bool
+}
+
+// MarkBaseline records that the feature is a baseline: its requirements are
+// implemented by code that already existed, not by plan tasks.
+func (ix *Index) MarkBaseline() {
+	ix.baseline = true
+	for i := range ix.entries {
+		ix.entries[i].baseline = true
+	}
 }
 
 // Links are the implementation links of a feature, keyed by spec, group or task ID.
@@ -229,10 +241,14 @@ func (e Entry) Render() string {
 		}
 		return list(xs)
 	}
-	switch e.Kind {
-	case KindRequirement, KindCriterion:
+	switch {
+	case e.baseline && (e.Kind == KindRequirement || e.Kind == KindCriterion):
+		// Replace the empty plan row: the code predates the spec.
+		rows[len(rows)-1] = row{"plan", "(baseline: existing code)"}
+		rows = append(rows, row{"tests", list(e.Tests)})
+	case e.Kind == KindRequirement, e.Kind == KindCriterion:
 		rows = append(rows, row{"commits", impl(e.Commits)}, row{"tests", impl(e.Tests)})
-	case KindGroup, KindTask:
+	case e.Kind == KindGroup, e.Kind == KindTask:
 		rows = append(rows, row{"commit", impl(e.Commits)})
 	}
 	for i, r := range rows {
@@ -250,9 +266,12 @@ func (e Entry) Render() string {
 func (ix *Index) Matrix() string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "# Traceability matrix: %s\n\n", ix.Feature)
-	if ix.linked {
+	switch {
+	case ix.baseline:
+		sb.WriteString("Baseline: documents existing code (no plan).\n\n| ID | Parent | Title | Technical | Tests |\n|---|---|---|---|---|\n")
+	case ix.linked:
 		sb.WriteString("| ID | Parent | Title | Technical | Plan | Commits | Tests |\n|---|---|---|---|---|---|---|\n")
-	} else {
+	default:
 		sb.WriteString("| ID | Parent | Title | Technical | Plan |\n|---|---|---|---|---|\n")
 	}
 	gap := func(e Entry, xs []string) string {
@@ -272,6 +291,10 @@ func (ix *Index) Matrix() string {
 		if e.Retired {
 			id = "~~" + id + "~~"
 		}
+		if ix.baseline {
+			fmt.Fprintf(&sb, "| %s | %s | %s | %s | %s |\n", id, cell(e.Parent), cell(e.Title), gap(e, e.Technical), cell(strings.Join(e.Tests, ", ")))
+			continue
+		}
 		row := fmt.Sprintf("| %s | %s | %s | %s | %s |", id, cell(e.Parent), cell(e.Title), gap(e, e.Technical), gap(e, e.Tasks))
 		if ix.linked {
 			commits := make([]string, 0, len(e.Commits))
@@ -286,7 +309,7 @@ func (ix *Index) Matrix() string {
 		}
 		sb.WriteString(row + "\n")
 	}
-	if !ix.linked {
+	if !ix.linked && !ix.baseline {
 		sb.WriteString("\nCommits and tests are linked once the feature is being implemented.\n")
 	}
 	return sb.String()

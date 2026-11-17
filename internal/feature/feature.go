@@ -140,7 +140,7 @@ func (f *Feature) reload() error {
 		f.parseDiags[a] = ds.InFile(file.Rel)
 	}
 	f.Statuses = workflow.Evaluate(f.State.Approvals, current)
-	f.Phase = workflow.Effective(f.State.Phase, f.Statuses)
+	f.Phase = workflow.EffectiveFor(f.State.Phase, f.Statuses, f.Baseline())
 	return nil
 }
 
@@ -187,8 +187,25 @@ func (f *Feature) Sync() diag.List {
 			if _, err := os.Stat(f.Layout.SpecDir(dep)); err != nil {
 				ds = append(ds, diag.Diagnostic{Severity: diag.Error, File: fn.Rel, Line: 1,
 					Message: fmt.Sprintf("depends_on: feature %q does not exist in specs/", dep)})
+				continue
+			}
+			if dep == f.Name || ValidName(dep) != nil {
+				continue
+			}
+			d, err := Load(f.Layout, f.Config, dep)
+			switch {
+			case err != nil:
+			case d.Baseline() && d.Phase != workflow.Baselined:
+				ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: fn.Rel, Line: 1,
+					Message: fmt.Sprintf("depends_on: baseline %q is not approved yet (phase %s)", dep, d.Phase)})
+			case !d.Baseline() && d.Statuses[workflow.Functional] != workflow.StatusApproved:
+				ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: fn.Rel, Line: 1,
+					Message: fmt.Sprintf("depends_on: feature %q has no approved functional spec yet", dep)})
 			}
 		}
+	}
+	if f.Baseline() && f.Files[workflow.Plan].Exists {
+		ds = append(ds, errAt(f.Files[workflow.Plan].Rel, "a baseline feature has no plan: it documents code that already exists (remove plan.md, or create a new feature for new work)"))
 	}
 	if f.Technical != nil {
 		if f.Functional == nil {
@@ -253,6 +270,16 @@ func sourceHash(file, key, recorded, current string) diag.List {
 	return nil
 }
 
+// OriginExisting marks a baseline feature.
+const OriginExisting = "existing"
+
+// Baseline reports whether the feature documents code that already exists
+// (adopted from a brownfield project): it has specs but no plan and no
+// implementation.
+func (f *Feature) Baseline() bool {
+	return f.State.Origin == OriginExisting || (f.Functional != nil && f.Functional.Meta.Origin == OriginExisting)
+}
+
 // ApproveCommand returns the command that approves an artifact.
 func ApproveCommand(feature string, a workflow.Artifact) string {
 	if a == workflow.Plan {
@@ -292,6 +319,9 @@ func (f *Feature) Next() string {
 	}
 	switch f.Phase {
 	case workflow.FunctionalDrafting:
+		if f.Baseline() && f.Files[workflow.Functional].Exists && f.Statuses[workflow.Functional] == workflow.StatusDraft {
+			return fmt.Sprintf("document the existing behavior in specs/%s/functional.md with your agent (`/sdd-adopt` in Claude Code), then the user approves it with `%s`", n, ApproveCommand(n, workflow.Functional))
+		}
 		if !f.Files[workflow.Functional].Exists {
 			return fmt.Sprintf("draft the functional spec with your agent (`/sdd-spec %s` in Claude Code) or create it with `sdd spec new %s`", n, n)
 		}
@@ -301,6 +331,9 @@ func (f *Feature) Next() string {
 	case workflow.TechnicalDrafting:
 		return edit(workflow.Technical)
 	case workflow.TechnicalApproved:
+		if f.Baseline() {
+			return fmt.Sprintf("re-approve the technical spec with `sdd spec approve %s --technical`", n)
+		}
 		return fmt.Sprintf("draft the plan with your agent (`/sdd-plan %s` in Claude Code) or create it with `sdd plan new %s`", n, n)
 	case workflow.PlanDrafting:
 		return edit(workflow.Plan)
@@ -323,6 +356,8 @@ func (f *Feature) Next() string {
 		return fmt.Sprintf("continue with your agent (`/sdd-implement %s` in Claude Code)", n)
 	case workflow.Implemented:
 		return fmt.Sprintf("run `sdd validate %s` (integration tests and every consistency check; writes report.md)", n)
+	case workflow.Baselined:
+		return fmt.Sprintf("nothing: the baseline is approved. New features that build on this code declare `depends_on: [%s]`; if one changes adopted behavior, revise this baseline's specs and re-approve them", n)
 	case workflow.Validated:
 		return fmt.Sprintf("merge branch sdd/%s into your branch (merge, PR or rebase), then remove the worktree with `sdd clean %s`", n, n)
 	}

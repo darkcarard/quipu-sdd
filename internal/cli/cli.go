@@ -57,6 +57,7 @@ func (a *App) commands() []command {
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
 		{name: "guide", summary: "Print the drafting instructions and template for a topic", run: (*App).runGuide},
 		{name: "mcp", summary: "Serve sdd to a coding agent over MCP (stdio)", run: (*App).runMCP},
+		{name: "adopt", summary: "Inventory an existing project to document it as baseline specs", run: (*App).runAdopt},
 		{name: "feature", summary: "Show or change a feature's title and description", run: (*App).runFeature},
 		{name: "spec", summary: "Create, lint and approve specs", run: (*App).runSpec},
 		{name: "plan", summary: "Create and approve the implementation plan", run: (*App).runPlan},

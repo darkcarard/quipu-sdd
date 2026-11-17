@@ -55,6 +55,8 @@ var (
 	ErrAlreadyApproved = errors.New("already approved")
 	// ErrBlocked is returned when lint or sync errors prevent an approval.
 	ErrBlocked = errors.New("approval blocked by errors")
+	// ErrBaselinePlan is returned when a plan is created or approved for a baseline feature.
+	ErrBaselinePlan = errors.New("a baseline feature has no plan: it documents code that already exists; create a new feature (with depends_on) for new work")
 	// ErrHumanOnly is returned when an agent attempts a human-only action.
 	ErrHumanOnly = errors.New("approvals are human-only: ask the user to run the approval command")
 )
@@ -74,6 +76,8 @@ func Open(l state.Layout, cfg config.Config, name string) (*Feature, error) {
 type Info struct {
 	Title       string
 	Description string
+	// Baseline creates a baseline feature: specs that document existing code.
+	Baseline bool
 }
 
 // Title returns the feature title: the one recorded in state.json, else the
@@ -103,10 +107,16 @@ func (f *Feature) Create(a workflow.Artifact, info Info, who Identity, now time.
 		}
 		return "", fmt.Errorf("%s already exists", file.Rel)
 	}
+	if a == workflow.Plan && f.Baseline() {
+		return "", ErrBaselinePlan
+	}
 	if err := f.requireSources(a); err != nil {
 		return "", err
 	}
 	if a == workflow.Functional {
+		if info.Baseline {
+			f.State.Origin = OriginExisting
+		}
 		if t := strings.TrimSpace(info.Title); t != "" {
 			f.State.Title = t
 		}
@@ -129,6 +139,11 @@ func (f *Feature) Create(a workflow.Artifact, info Info, who Identity, now time.
 	}))
 	if content, err = f.stamp(a, content); err != nil {
 		return "", fmt.Errorf("%s template: %w", FileName(a), err)
+	}
+	if a == workflow.Functional && f.State.Origin == OriginExisting {
+		if content, err = markdown.SetFrontmatter(content, "origin", OriginExisting); err != nil {
+			return "", fmt.Errorf("%s template: %w", FileName(a), err)
+		}
 	}
 	if err := os.MkdirAll(filepath.Dir(file.Path), 0o755); err != nil {
 		return "", err
@@ -212,6 +227,9 @@ func (f *Feature) stamp(a workflow.Artifact, content []byte) ([]byte, error) {
 func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (diag.List, error) {
 	if who.Agent != "" {
 		return nil, ErrHumanOnly
+	}
+	if a == workflow.Plan && f.Baseline() {
+		return nil, ErrBaselinePlan
 	}
 	file := f.Files[a]
 	if !file.Exists {
@@ -319,7 +337,7 @@ func (f *Feature) SaveState() error {
 // SetPhase records a new stored phase and recomputes the effective one.
 func (f *Feature) SetPhase(p workflow.Phase) {
 	f.State.Phase = p
-	f.Phase = workflow.Effective(p, f.Statuses)
+	f.Phase = workflow.EffectiveFor(p, f.Statuses, f.Baseline())
 }
 
 // record appends an event to the journal and regenerates log.md.

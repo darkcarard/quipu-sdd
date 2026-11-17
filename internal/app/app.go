@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/darkcarard/sdd-framework/internal/adopt"
 	"github.com/darkcarard/sdd-framework/internal/config"
 	"github.com/darkcarard/sdd-framework/internal/diag"
 	"github.com/darkcarard/sdd-framework/internal/feature"
@@ -228,12 +229,16 @@ type Summary struct {
 }
 
 func summarize(f *feature.Feature) Summary {
-	return Summary{
+	s := Summary{
 		Name: f.Name, Title: f.Title(), Phase: string(f.Phase),
 		Functional: string(f.Statuses[workflow.Functional]),
 		Technical:  string(f.Statuses[workflow.Technical]),
 		Plan:       string(f.Statuses[workflow.Plan]),
 	}
+	if f.Baseline() && !f.Files[workflow.Plan].Exists {
+		s.Plan = "n/a" // a baseline documents existing code: it has no plan
+	}
+	return s
 }
 
 // Overview summarizes every feature of the project.
@@ -354,6 +359,8 @@ type NewSpecInput struct {
 	Title       string
 	Description string
 	Technical   bool
+	// Baseline creates a baseline feature that documents existing code.
+	Baseline bool
 }
 
 // NewSpec creates a feature's functional spec, or its technical spec.
@@ -375,6 +382,7 @@ func (a *App) NewSpec(ctx context.Context, in NewSpecInput) (Created, error) {
 	if err != nil {
 		return Created{}, err
 	}
+	info.Baseline = in.Baseline
 	return a.create(ctx, name, workflow.Functional, info)
 }
 
@@ -588,4 +596,31 @@ func (a *App) Matrix(ctx context.Context, arg string) (string, error) {
 		return "", err
 	}
 	return ix.Matrix(), nil
+}
+
+// AdoptContext inventories the project for adoption and lists the features
+// sdd already knows, marking baselines.
+func (a *App) AdoptContext(ctx context.Context) (string, error) {
+	inv, err := adopt.Scan(ctx, a.Root)
+	if err != nil {
+		return "", err
+	}
+	text := adopt.Format(inv)
+	list, err := a.Overview()
+	if err != nil {
+		return "", err
+	}
+	if len(list) > 0 {
+		var sb strings.Builder
+		sb.WriteString("\n## Features in sdd\n\n")
+		for _, s := range list {
+			kind := ""
+			if f, err := feature.Load(a.Layout, a.Config, s.Name); err == nil && f.Baseline() {
+				kind = " (baseline)"
+			}
+			fmt.Fprintf(&sb, "- %s%s: %s\n", s.Name, kind, s.Phase)
+		}
+		text += sb.String()
+	}
+	return text + "\nNext: follow `guide adopt`.\n", nil
 }

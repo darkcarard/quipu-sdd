@@ -44,7 +44,7 @@ Approval and review commands are human-only: they are not exposed as MCP tools, 
 | `/sdd-plan <feature>` | Drafting the plan | M4 |
 | `/sdd-implement <feature>` | Implementing tasks until the current group is ready for review | M5 |
 | `/sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria | M6 |
-| `/sdd-adopt` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
+| `/sdd-adopt [area]` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
 
 Re-running `sdd init --agent claude` after upgrading `sdd` adds the commands of new milestones; existing ones are left as they are.
 
@@ -206,8 +206,9 @@ The four phases above assume new code. A project that already has code first rec
 | Command | Who | Purpose |
 |---|---|---|
 | `/sdd-adopt` | user → agent | Explore the codebase and document it as one or more baseline features |
-| `sdd adopt --context` | agent | CLI form of `adopt_context`: languages, build files, detected build/lint/test commands, top-level layout, test directories and existing docs |
-| `sdd spec new <feature> --baseline` | user or agent | Create a baseline feature (`origin: existing` in the frontmatter) |
+| `sdd adopt --context` | agent | CLI form of `adopt_context`: languages, build files, suggested build/lint/test/integration commands (from `Makefile` targets, `go.mod`, `package.json` scripts with the package manager its lockfile implies, `Cargo.toml`, Python, Maven and Gradle files), the top-level layout, test files and existing docs, plus the features sdd already knows. It lists only files git sees (or, outside git, skips vendored and hidden directories) |
+| `sdd guide adopt` | agent | The adoption instructions (`guide` topic `adopt`) |
+| `sdd spec new <feature> --baseline` | user or agent | Create a baseline feature (`origin: existing` in the functional spec's frontmatter and in `state.json`); MCP `spec_new` with `baseline: true` |
 | `sdd spec approve <feature> --functional/--technical` | **user** | Approve each baseline spec as usual |
 
 The adoption flow:
@@ -218,8 +219,10 @@ The adoption flow:
 
 Afterwards:
 - New features declare `depends_on: [<baseline feature>]` and go through the four phases. Their technical specs reuse the baseline's commands and components.
-- Baseline traceability stops at the technical spec. Existing tests need no `covers:` references, and the plan ↔ code checks do not apply to baseline features.
-- When a later feature changes adopted behavior, the baseline spec is revised in the same way as any spec (retire or amend its IDs and re-approve), so the baseline keeps describing the code as it is.
+- A baseline has no plan and is never implemented or validated: `sdd plan new` and `sdd plan approve` refuse it, `sync check` reports a `plan.md` in it, and `sdd status` shows its plan as `n/a`.
+- Baseline traceability stops at the technical spec: `sdd trace` shows its requirements as implemented by existing code. Existing tests need no `covers:` references; those that have them are linked, and the plan ↔ code checks do not apply.
+- `sync check` warns when a feature depends on a baseline that is not (or no longer) `baselined`, or on a regular feature whose functional spec is not approved.
+- When a later feature changes adopted behavior, the baseline spec is revised in the same way as any spec (retire or amend its IDs and re-approve): editing it reopens it, and re-approving both specs makes it `baselined` again, so the baseline keeps describing the code as it is.
 
 ## Commands at a Glance
 

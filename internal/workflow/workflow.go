@@ -25,12 +25,15 @@ const (
 	Implementing       Phase = "implementing"
 	Implemented        Phase = "implemented"
 	Validated          Phase = "validated"
+	// Baselined: a baseline feature documents code that already exists. Both
+	// specs are approved; it has no plan and no implementation.
+	Baselined Phase = "baselined"
 )
 
 // phaseOrder lists phases in workflow order.
 var phaseOrder = []Phase{
 	FunctionalDrafting, FunctionalApproved, TechnicalDrafting, TechnicalApproved,
-	PlanDrafting, PlanApproved, Implementing, Implemented, Validated,
+	PlanDrafting, PlanApproved, Implementing, Implemented, Validated, Baselined,
 }
 
 // Phases returns all phases in workflow order.
@@ -200,6 +203,15 @@ func Evaluate(approvals map[Artifact]Approval, current map[Artifact]string) map[
 // reflected; an edited or stale artifact reopens its drafting phase. From
 // implementing onwards the stored phase is kept while the artifacts are approved.
 func Effective(stored Phase, st map[Artifact]ArtifactStatus) Phase {
+	return EffectiveFor(stored, st, false)
+}
+
+// EffectiveFor is Effective for a feature that may be a baseline: a baseline
+// feature whose two specs are approved is baselined (it has no plan).
+func EffectiveFor(stored Phase, st map[Artifact]ArtifactStatus, baseline bool) Phase {
+	if baseline && st[Functional] == StatusApproved && st[Technical] == StatusApproved {
+		return Baselined
+	}
 	var derived Phase
 	switch {
 	case st[Functional] != StatusApproved:

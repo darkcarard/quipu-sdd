@@ -104,7 +104,6 @@ Agent-facing output is kept compact on purpose, because it is read by the agent 
 * **Traceability and recovery:** journal, checkpoints, locks, `sdd status`, `sdd resume`, `sdd trace`, `sdd sync check`.
 
 ### Out of Scope (MVP)
-* Adoption of existing (brownfield) projects (M7).
 * Integration files for agents other than Claude Code (M8).
 * **API mode:** an agent loop inside `sdd` that calls LLM APIs directly, for unattended runs. A Claude provider was built for it (`internal/provider`, `internal/transcript`) and is kept, unused, for a possible future version.
 * Local model inference.
