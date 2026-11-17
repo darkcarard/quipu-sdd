@@ -10,6 +10,7 @@ Context for Claude Code sessions on this repository, on any machine.
 - `docs/TRACEABILITY.md`: audit journal, ID chain, checkpoints and `sdd resume`
 - `docs/ROADMAP.md`: milestones and exit criteria
 - `docs/E2E_TEST.md`: manual end-to-end test in a real Claude Code session
+- `docs/MANUAL.html` / `docs/MANUAL.es.html`: illustrated user manual (English / Spanish, kept in sync; update both when commands or the workflow change)
 
 ## Current status
 - **M0 (scaffold): done.** `sdd init` and `sdd version`.

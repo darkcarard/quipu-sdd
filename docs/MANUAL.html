@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>sdd User Manual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html { color-scheme: light; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+/* Layout: one reading column; a four-station "gated track" diagram is the centerpiece,
+   with the three roles (you / agent / sdd) color-coded everywhere. */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --sunken: #e9eeec;
+  --ink: #15211f;
+  --muted: #56645f;
+  --line: #d3dcd8;
+  --agent: #0b7a6e;      /* the coding agent */
+  --agent-soft: #dcf0ec;
+  --you: #b4660a;        /* human gates */
+  --you-soft: #fbecd6;
+  --sdd: #34465a;        /* the deterministic tool */
+  --sdd-soft: #e2e8ef;
+  --code-bg: #14201e;
+  --code-fg: #dfeae6;
+  --code-dim: #8fa49d;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1615; --surface: #16201e; --sunken: #1c2826; --ink: #e6efec; --muted: #9db0aa; --line: #2b3a37;
+    --agent: #4cc4b2; --agent-soft: #143430; --you: #f0a54a; --you-soft: #3a2a14; --sdd: #a9bccf; --sdd-soft: #222e3a;
+    --code-bg: #0a100f; --code-fg: #dfeae6; --code-dim: #7d918b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1615; --surface: #16201e; --sunken: #1c2826; --ink: #e6efec; --muted: #9db0aa; --line: #2b3a37;
+  --agent: #4cc4b2; --agent-soft: #143430; --you: #f0a54a; --you-soft: #3a2a14; --sdd: #a9bccf; --sdd-soft: #222e3a;
+  --code-bg: #0a100f; --code-fg: #dfeae6; --code-dim: #7d918b; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1000px; margin: 0 auto; padding-block: 44px 64px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.12; text-wrap: balance; margin: 0; }
+h2 { font-size: clamp(28px, 4vw, 38px); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: 20px; font-weight: 700; }
+p { margin: 0; }
+.prose { max-width: 66ch; color: var(--muted); }
+.eyebrow { font-family: var(--font-mono); font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+code, kbd { font-family: var(--font-mono); font-size: 0.9em; }
+:not(pre) > code { background: var(--sunken); padding: 1px 6px; border-radius: 5px; overflow-wrap: anywhere; }
+a { color: var(--agent); }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--agent); outline-offset: 2px; }
+section { display: flex; flex-direction: column; gap: 28px; scroll-margin-top: 16px; }
+.head { display: flex; flex-direction: column; gap: 12px; }
+
+/* role tags */
+.tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  padding: 3px 10px; border-radius: 999px; white-space: nowrap; letter-spacing: 0.02em; }
+.tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.tag.you { color: var(--you); background: var(--you-soft); }
+.tag.agent { color: var(--agent); background: var(--agent-soft); }
+.tag.sdd { color: var(--sdd); background: var(--sdd-soft); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+.hero h1 { font-size: clamp(44px, 7.5vw, 84px); font-weight: 800; letter-spacing: -0.035em; }
+.hero h1 .mono { font-family: var(--font-mono); font-weight: 500; letter-spacing: -0.04em; color: var(--agent); }
+.hero .lede { font-size: 19px; color: var(--muted); max-width: 46ch; margin-top: 18px; }
+.hero .lede strong { color: var(--ink); font-weight: 600; }
+.nav { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-size: 14.5px; }
+.nav a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.nav a:hover { border-color: var(--agent); }
+
+.triad { display: flex; flex-direction: column; gap: 10px; }
+.role { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; align-items: start; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.role .dot { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; }
+.role.you .dot { background: var(--you-soft); color: var(--you); }
+.role.agent .dot { background: var(--agent-soft); color: var(--agent); }
+.role.sdd .dot { background: var(--sdd-soft); color: var(--sdd); }
+.role b { display: block; font-family: var(--font-display); font-size: 17px; }
+.role span { color: var(--muted); font-size: 14.5px; line-height: 1.5; display: block; }
+
+/* principles */
+.principles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.principle { display: flex; flex-direction: column; gap: 8px; border-top: 2px solid var(--ink); padding-top: 16px; }
+.principle p { color: var(--muted); font-size: 15px; }
+
+/* track */
+.track-scroll { overflow-x: auto; padding-bottom: 4px; }
+.track { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 0; min-width: 820px; position: relative; }
+.station { position: relative; padding: 0 14px; display: flex; flex-direction: column; gap: 12px; }
+.station:first-child { padding-left: 0; }
+.station:last-child { padding-right: 0; }
+.rail { position: relative; height: 40px; display: flex; align-items: center; }
+.rail::before { content: ""; position: absolute; left: 0; right: -14px; top: 50%; height: 3px; background: var(--line); transform: translateY(-50%); }
+.station:last-child .rail::before { right: 0; }
+.station:not(:first-child) .rail::before { left: -14px; }
+.rail .num { position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--bg);
+  display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 17px; }
+.station h3 { font-size: 22px; }
+.station .what { color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.files { display: flex; flex-direction: column; gap: 6px; }
+.file { font-family: var(--font-mono); font-size: 12.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
+  display: flex; justify-content: space-between; gap: 8px; }
+.file small { color: var(--muted); font-size: 11.5px; }
+.gate { display: flex; flex-direction: column; gap: 4px; border: 1.5px dashed var(--you); background: var(--you-soft); border-radius: 8px; padding: 9px 11px; }
+.gate .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--you); font-weight: 500; }
+.gate code { background: transparent; padding: 0; font-size: 12.5px; color: var(--ink); }
+.always { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; background: var(--sdd-soft); border-radius: var(--r); padding: 14px 18px; font-size: 14.5px; }
+.always code { background: var(--surface); }
+
+/* code blocks */
+.code { position: relative; background: var(--code-bg); color: var(--code-fg); border-radius: var(--r); min-width: 0; }
+.code pre { margin: 0; padding: 16px 78px 16px 18px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 13.5px; line-height: 1.65; }
+.code .c { color: var(--code-dim); }
+.code .p { color: #4cc4b2; user-select: none; }
+.code .s { color: #f0a54a; }
+.code .where { position: absolute; top: -10px; left: 14px; }
+.code.has-where pre { padding-top: 22px; }
+.copy { position: absolute; top: 8px; right: 8px; font-family: var(--font-mono); font-size: 11.5px; color: var(--code-fg); background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+.copy:hover { background: rgba(255,255,255,0.16); }
+
+/* setup */
+.setup { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.setup .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.setup .card p { color: var(--muted); font-size: 14.5px; }
+.stepno { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+/* walkthrough */
+.steps { display: flex; flex-direction: column; gap: 0; counter-reset: s; }
+.step { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 20px; position: relative; padding-bottom: 40px; }
+.step:last-child { padding-bottom: 0; }
+.step::before { content: ""; position: absolute; left: 27px; top: 52px; bottom: 6px; width: 2px; background: var(--line); }
+.step:last-child::before { display: none; }
+.step .n { width: 56px; height: 56px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+.step .body { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding-top: 4px; }
+.step .body > p { color: var(--muted); max-width: 66ch; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.pair .code { margin-top: 10px; }
+.check { font-size: 14.5px; color: var(--muted); display: flex; gap: 10px; align-items: baseline; }
+.check::before { content: "✓"; color: var(--agent); font-weight: 700; }
+
+/* loop */
+.loop { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.chip { font-family: var(--font-mono); font-size: 13px; padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.chip.agent { border-color: var(--agent); color: var(--agent); background: var(--agent-soft); }
+.chip.sdd { border-color: var(--sdd); color: var(--sdd); background: var(--sdd-soft); }
+.chip.you { border-color: var(--you); color: var(--you); background: var(--you-soft); }
+.arrow { color: var(--muted); font-family: var(--font-mono); }
+.loop .note { font-size: 14.5px; color: var(--muted); max-width: 70ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* split */
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.tree { font-family: var(--font-mono); font-size: 13.5px; line-height: 1.75; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; overflow-x: auto; white-space: pre; }
+.tree .d { color: var(--muted); }
+.tree .k { color: var(--agent); }
+.tree .y { color: var(--you); }
+
+/* table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--sunken); }
+td code { white-space: nowrap; }
+td.who { white-space: nowrap; }
+
+/* faq */
+.faq { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.faq div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.faq p { color: var(--muted); font-size: 14.5px; }
+
+/* tabs */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+  margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.topbar-in { max-width: 1000px; margin: 0 auto; display: flex; align-items: center; gap: 24px; min-width: 0; }
+.brand { font-family: var(--font-display); font-weight: 700; font-size: 17px; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.brand .mono { font-family: var(--font-mono); font-weight: 500; color: var(--agent); }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { white-space: nowrap; text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; padding: 16px 12px 14px; border-bottom: 2px solid transparent; }
+.tabs a:hover { color: var(--ink); }
+.tabs a[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--agent); }
+.panel { display: flex; flex-direction: column; gap: 72px; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; text-decoration: none; font-weight: 600; font-size: 15px; padding: 10px 18px; border-radius: 9px; background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn:hover { opacity: .88; }
+.pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 22px; }
+.pager a { text-decoration: none; display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); min-width: 160px; }
+.pager a small { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pager a.next { margin-left: auto; text-align: right; }
+.pager a:hover { border-color: var(--agent); }
+@media (max-width: 600px) { .brand { display: none; } .tabs a { padding-inline: 10px; } }
+
+.lang { margin-left: auto; white-space: nowrap; font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+.lang:hover { color: var(--ink); border-color: var(--agent); }
+
+footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+
+@media (max-width: 820px) {
+  .hero, .split, .faq, .pair { grid-template-columns: minmax(0, 1fr); }
+  .principles, .setup { grid-template-columns: minmax(0, 1fr); }
+  .wrap { gap: 44px; padding-block: 28px 48px; }
+  .panel { gap: 56px; }
+}
+@media (max-width: 480px) {
+  .step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
+  .step .n { width: 40px; height: 40px; border-radius: 12px; font-size: 17px; }
+  .step::before { left: 19px; top: 46px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .copy { transition: background .15s; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#overview"><span class="mono">sdd</span> manual</a>
+    <nav class="tabs" role="tablist" aria-label="Manual sections">
+      <a role="tab" href="#overview">Overview</a>
+      <a role="tab" href="#workflow">Workflow</a>
+      <a role="tab" href="#setup">Set up</a>
+      <a role="tab" href="#first-feature">First feature</a>
+      <a role="tab" href="#existing">Existing projects</a>
+      <a role="tab" href="#reference">Reference</a>
+      <a role="tab" href="#help">Help</a>
+    </nav>
+    <a class="lang" href="MANUAL.es.html" hreflang="es">Español</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="panel" data-panel="overview" role="tabpanel">
+  <header class="hero">
+    <div>
+      <div class="eyebrow">User manual · Spec-Driven Development</div>
+      <h1 style="margin-top:14px">Build from the spec with <span class="mono">sdd</span></h1>
+      <p class="lede">Your coding agent writes the specs, the plan and the code. <strong>You approve each step.</strong> <code>sdd</code> checks everything, commits the work and keeps a record of who did what.</p>
+      <div class="cta"><a class="btn" href="#setup">Set up sdd</a><a class="btn ghost" href="#workflow">See the workflow</a></div>
+    </div>
+    <div class="triad" aria-label="The three roles">
+      <div class="role you"><div class="dot">You</div><div><b>You decide</b><span>Answer the agent's questions, approve specs and the plan, review every group of code.</span></div></div>
+      <div class="role agent"><div class="dot">AI</div><div><b>Your agent writes</b><span>Claude Code drafts the specs and the plan, then writes the code task by task.</span></div></div>
+      <div class="role sdd"><div class="dot">sdd</div><div><b>sdd checks</b><span>Creates the files, lints them, runs your build and tests, commits and logs. It never calls an AI model.</span></div></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="head">
+      <div class="eyebrow">What it is</div>
+      <h2>One binary, four phases, no surprises</h2>
+      <p class="prose"><code>sdd</code> is a command-line tool that runs next to the coding agent you already use. Every change to your project starts as a <strong>feature</strong>: a written spec of what it must do, a technical design, a plan split into small tasks, and only then code. Each phase ends at a gate that only a person can open.</p>
+    </div>
+    <div class="principles">
+      <div class="principle"><h3>Uses your subscription</h3><p>The reasoning comes from Claude Code, under your own plan. <code>sdd</code> is deterministic and works offline.</p></div>
+      <div class="principle"><h3>Humans hold the gates</h3><p>Approvals are not available to the agent. Its permission rules deny them, and <code>sdd</code> rejects them when they come from the agent.</p></div>
+      <div class="principle"><h3>Every line is traceable</h3><p>Requirement → design → task → commit → test. <code>sdd trace FR-001</code> shows the whole chain.</p></div>
+    </div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="workflow" role="tabpanel">
+  <section>
+    <div class="head">
+      <div class="eyebrow">The workflow</div>
+      <h2>Four stations, with a gate at each</h2>
+      <p class="prose">A feature moves left to right. The agent drafts what is in each station; the amber gates are yours. If an approved document changes later, <code>sdd</code> flags everything that depends on it as stale.</p>
+    </div>
+    <div class="track-scroll">
+      <div class="track">
+        <div class="station">
+          <div class="rail"><span class="num">1</span></div>
+          <h3>Specify</h3>
+          <p class="what">What the feature must do, then how it will be built.</p>
+          <div class="files">
+            <div class="file">functional.md <small>FR · NFR · AC</small></div>
+            <div class="file">technical.md <small>ADR · commands</small></div>
+          </div>
+          <div class="gate"><span class="label">Your gate ×2</span><code>sdd spec approve &lt;f&gt; --functional</code><code>sdd spec approve &lt;f&gt; --technical</code></div>
+        </div>
+        <div class="station">
+          <div class="rail"><span class="num">2</span></div>
+          <h3>Plan</h3>
+          <p class="what">Groups of small tasks. Every requirement must be covered.</p>
+          <div class="files">
+            <div class="file">plan.md <small>G1 · T1.1 …</small></div>
+          </div>
+          <div class="gate"><span class="label">Your gate</span><code>sdd plan approve &lt;f&gt;</code></div>
+        </div>
+        <div class="station">
+          <div class="rail"><span class="num">3</span></div>
+          <h3>Implement</h3>
+          <p class="what">The agent codes one task at a time in an isolated git worktree. Each group ends in one commit.</p>
+          <div class="files">
+            <div class="file">branch sdd/&lt;f&gt; <small>1 commit / group</small></div>
+          </div>
+          <div class="gate"><span class="label">Your gate, per group</span><code>sdd review &lt;f&gt;</code><code>sdd approve &lt;f&gt;</code></div>
+        </div>
+        <div class="station">
+          <div class="rail"><span class="num">4</span></div>
+          <h3>Validate</h3>
+          <p class="what">Integration tests, every consistency check, and a final report.</p>
+          <div class="files">
+            <div class="file">report.md <small>phase: validated</small></div>
+          </div>
+          <div class="gate"><span class="label">You run it</span><code>sdd validate &lt;f&gt;</code></div>
+        </div>
+      </div>
+    </div>
+    <div class="always"><span class="tag sdd">any time</span><code>sdd status</code><code>sdd sync check</code><code>sdd trace &lt;ID&gt;</code><span style="color:var(--muted)">show where you are, what is out of date, and how an ID connects.</span></div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="setup" role="tabpanel">
+  <section>
+    <div class="head">
+      <div class="eyebrow">Set up · once</div>
+      <h2>Install, initialize, connect</h2>
+      <p class="prose">You need Go 1.25, git and Claude Code. Install the binary once per machine; set up each project with <code>sdd init</code>. It only creates missing files and never changes one you already have.</p>
+    </div>
+    <div class="setup">
+      <div class="card">
+        <span class="stepno">A · per machine</span>
+        <h3>Install sdd</h3>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>git clone https://github.com/darkcarard/sdd-framework
+<span class="p">$ </span>cd sdd-framework
+<span class="p">$ </span>make install
+<span class="p">$ </span>sdd version</pre></div>
+        <p>It installs to <code>~/go/bin</code>. Make sure that folder is on your <code>PATH</code>.</p>
+      </div>
+      <div class="card">
+        <span class="stepno">B · per project</span>
+        <h3>Initialize the project</h3>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>cd my-project
+<span class="p">$ </span>sdd init --agent claude
+<span class="p">$ </span>git add -A
+<span class="p">$ </span>git commit -m "Set up sdd"</pre></div>
+        <p>Adds <code>sdd.yaml</code>, templates, the <code>/sdd-*</code> commands, the MCP server and the permission rules. The repository needs at least one commit before implementing.</p>
+      </div>
+      <div class="card">
+        <span class="stepno">C · per project</span>
+        <h3>Open Claude Code</h3>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>claude
+<span class="c"># approve the "sdd" MCP server</span>
+<span class="p">&gt; </span>/mcp</pre></div>
+        <p>Claude Code asks once to approve the <code>sdd</code> server. <code>/mcp</code> should list it as connected, and typing <code>/</code> shows the <code>/sdd-*</code> commands.</p>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="first-feature" role="tabpanel">
+  <section>
+    <div class="head">
+      <div class="eyebrow">Your first feature</div>
+      <h2>From an idea to validated code</h2>
+      <p class="prose">Keep two windows open: Claude Code, where the agent works, and a terminal, where you approve. Replace <code>&lt;f&gt;</code> with the feature name <code>sdd</code> gives you; <code>sdd status</code> lists them.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <div class="body">
+          <h3>Describe what you want</h3>
+          <p>The agent creates the feature, asks you questions and writes the functional spec: requirements (<code>FR-001</code>), non-functional requirements (<code>NFR-001</code>) and testable acceptance criteria (<code>AC-001</code>). <code>sdd</code> turns your description into a short, safe feature name.</p>
+          <div class="pair">
+            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-spec A to-do list CLI: add, list and complete tasks stored in a JSON file</pre></div></div>
+            <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd status
+<span class="p">$ </span>sdd spec lint &lt;f&gt;
+<span class="p">$ </span>sdd spec approve &lt;f&gt; --functional</pre></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">2</div>
+        <div class="body">
+          <h3>Agree on the design</h3>
+          <p>The technical spec records the architecture, decisions (<code>ADR-001</code>), which component covers each requirement, and the build, lint and test commands <code>sdd</code> will run to verify the code.</p>
+          <div class="pair">
+            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-tech &lt;f&gt;</pre></div></div>
+            <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd spec approve &lt;f&gt; --technical</pre></div></div>
+          </div>
+          <span class="check">Check that the verification commands are real, e.g. <code>go build ./...</code> and <code>go test ./...</code>.</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">3</div>
+        <div class="body">
+          <h3>Approve the plan</h3>
+          <p>The plan splits the work into groups (<code>G1</code>, <code>G2</code>…) of small tasks (<code>T1.1</code>…), each touching a few files. <code>sdd sync check</code> fails if any requirement or criterion is left uncovered.</p>
+          <div class="pair">
+            <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-plan &lt;f&gt;</pre></div></div>
+            <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd sync check &lt;f&gt;
+<span class="p">$ </span>sdd plan approve &lt;f&gt;</pre></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">4</div>
+        <div class="body">
+          <h3>Implement, one group at a time</h3>
+          <p>You start the implementation; <code>sdd</code> creates an isolated worktree on branch <code>sdd/&lt;f&gt;</code>. The agent works through the group and stops when it is ready for your review. Approve it to continue, or send it back with feedback.</p>
+          <div class="pair">
+            <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
+              <span class="tag agent" style="margin-top:14px">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-implement &lt;f&gt;</pre></div></div>
+            <div><span class="tag you">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review &lt;f&gt;        <span class="c"># --diff for the full diff</span>
+<span class="p">$ </span>sdd approve &lt;f&gt;
+<span class="c"># or send it back:</span>
+<span class="p">$ </span>sdd revise &lt;f&gt; -m <span class="s">"Handle the empty file case"</span></pre></div></div>
+          </div>
+          <div class="loop">
+            <div class="legend"><span class="tag agent">agent</span><span class="tag sdd">sdd</span><span class="tag you">you</span></div>
+            <div class="flow" aria-label="Implementation loop">
+              <span class="chip agent">task_next</span><span class="arrow">→</span>
+              <span class="chip agent">write code</span><span class="arrow">→</span>
+              <span class="chip agent">task_done</span><span class="arrow">→</span>
+              <span class="chip sdd">build · lint · test</span><span class="arrow">↺ next task</span>
+            </div>
+            <div class="flow">
+              <span class="chip agent">group_verify</span><span class="arrow">→</span>
+              <span class="chip sdd">one commit with SDD trailers</span><span class="arrow">→</span>
+              <span class="chip you">sdd review</span><span class="arrow">→</span>
+              <span class="chip you">approve</span><span class="arrow">or</span><span class="chip you">revise</span><span class="arrow">→</span>
+              <span class="chip agent">/sdd-implement</span>
+            </div>
+            <p class="note">If a check fails, the agent gets the failing output and fixes it, up to <code>limits.max_fix_attempts</code> times (3 by default). Run <code>/sdd-implement &lt;f&gt;</code> again after each approval until every group is done.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="n">5</div>
+        <div class="body">
+          <h3>Validate and close</h3>
+          <p><code>sdd</code> runs the integration tests, checks that every group has its commit and every acceptance criterion has a test (a <code>covers: AC-001</code> comment), and writes the report. Optionally, ask the agent for a semantic review against the criteria.</p>
+          <div class="pair">
+            <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd validate &lt;f&gt;
+<span class="p">$ </span>sdd trace --matrix &lt;f&gt;</pre></div></div>
+            <div><span class="tag agent">in Claude Code · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-deep-review &lt;f&gt;</pre></div></div>
+          </div>
+          <span class="check">Merge branch <code>sdd/&lt;f&gt;</code> into your main branch the way your team usually does.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="existing" role="tabpanel">
+  <section>
+    <div class="split">
+      <div class="head">
+        <div class="eyebrow">Existing projects</div>
+        <h2>Adopt code you already have</h2>
+        <p class="prose">For a project that already has code, start by documenting it. <code>sdd adopt</code> builds a short inventory (languages, build files, likely commands, tests), and the agent writes <strong>baseline</strong> specs from it. Your code is not touched. Baseline features have no plan; new work then starts as normal features on top of them.</p>
+      </div>
+      <div class="pair" style="grid-template-columns:minmax(0,1fr)">
+        <div><span class="tag agent">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-adopt
+<span class="c"># or one area at a time:</span>
+<span class="p">&gt; </span>/sdd-adopt billing</pre></div></div>
+        <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd spec approve &lt;f&gt; --functional</pre></div></div>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="reference" role="tabpanel">
+  <section>
+    <div class="split">
+      <div class="head">
+        <div class="eyebrow">Where things live</div>
+        <h2>Everything is a file in your repo</h2>
+        <p class="prose">Specs, plans, state and the audit journal are committed with your code, so the history travels with the project. Worktrees, locks and run logs stay local and are ignored through <code>.sdd/.gitignore</code>.</p>
+        <p class="prose"><code>log.md</code> is a readable version of the journal: every step, who ran it (you, or <code>agent:claude-code</code>) and when.</p>
+      </div>
+      <div class="tree"><span class="d">my-project/</span>
+├─ sdd.yaml              <span class="d"># limits and settings</span>
+├─ specs/
+│  └─ <span class="k">todo-cli/</span>
+│     ├─ functional.md   <span class="d"># what</span>
+│     ├─ technical.md    <span class="d"># how</span>
+│     └─ plan.md         <span class="d"># tasks</span>
+├─ .sdd/
+│  ├─ templates/  profiles/
+│  ├─ features/<span class="k">todo-cli/</span>
+│  │  ├─ state.json      <span class="d"># phase, approvals</span>
+│  │  ├─ journal.jsonl   <span class="d"># audit trail</span>
+│  │  ├─ log.md
+│  │  └─ report.md
+│  └─ worktrees/         <span class="y"># local only</span>
+├─ .mcp.json
+└─ .claude/  skills/ settings.json</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="head">
+      <div class="eyebrow">Reference</div>
+      <h2>Commands at a glance</h2>
+      <p class="prose">Every command also has <code>--help</code>. The agent reaches the same functions through the <code>sdd</code> MCP server; the commands marked <span class="tag you">you</span> are never available to it.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Command</th><th>Who</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><code>sdd init --agent claude</code></td><td class="who"><span class="tag you">you</span></td><td>Set up the project for Claude Code. <code>--check</code> lists what is missing.</td></tr>
+          <tr><td><code>sdd status [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Phase of each feature and the next action.</td></tr>
+          <tr><td><code>/sdd-spec</code> · <code>/sdd-tech</code> · <code>/sdd-plan</code></td><td class="who"><span class="tag agent">agent</span></td><td>Draft the functional spec, the technical spec, the plan.</td></tr>
+          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content.</td></tr>
+          <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan.</td></tr>
+          <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Create the worktree and start the first group.</td></tr>
+          <tr><td><code>/sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
+          <tr><td><code>sdd review &lt;f&gt; [--diff]</code></td><td class="who"><span class="tag you">you</span></td><td>Summary of the group waiting for review.</td></tr>
+          <tr><td><code>sdd approve &lt;f&gt;</code> · <code>sdd revise &lt;f&gt; -m "…"</code></td><td class="who"><span class="tag you">you</span></td><td>Accept the group, or send it back with feedback.</td></tr>
+          <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Integration tests, all checks, <code>report.md</code>.</td></tr>
+          <tr><td><code>sdd sync check [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Consistency between specs, plan and code.</td></tr>
+          <tr><td><code>sdd trace &lt;ID&gt;</code> · <code>--matrix &lt;f&gt;</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Follow one ID, or print the full traceability matrix.</td></tr>
+          <tr><td><code>sdd feature describe &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Change a feature's title or description.</td></tr>
+          <tr><td><code>/sdd-adopt</code> · <code>/sdd-deep-review</code></td><td class="who"><span class="tag agent">agent</span></td><td>Document existing code; review code against the criteria.</td></tr>
+          <tr><td><code>sdd resume &lt;f&gt;</code> · <code>sdd clean &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Repair after an interruption; remove the worktree (the branch is kept).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  </div>
+
+<div class="panel" data-panel="help" role="tabpanel">
+  <section>
+    <div class="head">
+      <div class="eyebrow">When something goes wrong</div>
+      <h2>Common situations</h2>
+    </div>
+    <div class="faq">
+      <div><h3>I don't know where I am</h3><p>Run <code>sdd status &lt;f&gt;</code>. It shows the phase, the state of every document and the exact next command.</p></div>
+      <div><h3>Claude Code closed in the middle of a task</h3><p>Run <code>sdd resume &lt;f&gt;</code> in your terminal, then <code>/sdd-implement &lt;f&gt;</code> again. The journal knows which step was running.</p></div>
+      <div><h3>I edited a spec after approving it</h3><p>The approval no longer matches. <code>sdd sync check</code> shows what is stale; review the change and approve it again.</p></div>
+      <div><h3>The agent says it cannot approve</h3><p>That is by design. Run the approval yourself in a terminal.</p></div>
+      <div><h3>The MCP tools don't show up</h3><p>Check that <code>which sdd</code> finds the binary, then restart Claude Code in the project folder and approve the server.</p></div>
+      <div><h3>A group keeps failing its checks</h3><p>After the fix attempts run out, the group is marked failed and the agent stops. Check <code>sdd status &lt;f&gt;</code>, then send guidance with <code>sdd revise &lt;f&gt; -m "…"</code>.</p></div>
+    </div>
+  </section>
+</div>
+
+  <footer>
+    <span><code>sdd</code> · Spec-Driven Development for coding agents</span>
+    <span>More detail: <code>docs/WORKFLOW.md</code> · <code>docs/SPEC_GUIDELINES.md</code> · <code>docs/TRACEABILITY.md</code></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var panels = Array.prototype.slice.call(document.querySelectorAll('.panel'));
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs a'));
+  var names = panels.map(function (p) { return p.dataset.panel; });
+  var label = {};
+  tabs.forEach(function (t) { label[t.getAttribute('href').slice(1)] = t.textContent; });
+  panels.forEach(function (p, i) {
+    var pager = document.createElement('nav');
+    pager.className = 'pager';
+    pager.setAttribute('aria-label', 'Previous and next section');
+    if (i > 0) pager.innerHTML += '<a class="prev" href="#' + names[i - 1] + '"><small>Previous</small>← ' + label[names[i - 1]] + '</a>';
+    if (i < names.length - 1) pager.innerHTML += '<a class="next" href="#' + names[i + 1] + '"><small>Next</small>' + label[names[i + 1]] + ' →</a>';
+    p.appendChild(pager);
+  });
+  function show(first) {
+    var name = location.hash.slice(1);
+    if (names.indexOf(name) < 0) name = names[0];
+    panels.forEach(function (p) { p.hidden = p.dataset.panel !== name; });
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('href') === '#' + name;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on && t.scrollIntoView) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    if (!first) window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', function () { show(false); });
+  show(true);
+})();
+
+document.querySelectorAll('.copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var pre = btn.parentElement.querySelector('pre');
+    var lines = pre.innerText.split('\n')
+      .filter(function (l) { return !/^\s*#/.test(l); })
+      .map(function (l) { return l.replace(/^[$>] /, '').replace(/\s+#.*$/, ''); })
+      .filter(function (l) { return l.trim() !== ''; });
+    var text = lines.join('\n');
+    var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1400); };
+    try {
+      navigator.clipboard.writeText(text).then(done, function () { select(pre); });
+    } catch (e) { select(pre); }
+  });
+});
+function select(el) {
+  var r = document.createRange(); r.selectNodeContents(el);
+  var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+</script>
+</body>
+</html>

@@ -11,7 +11,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M6 done: the full greenfield workflow.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-*` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Existing projects are adopted with `/sdd-adopt`, which documents the current code as baseline specs without changing it. Next: integrations for more agents (M8). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M7 done: the full workflow, for new and existing projects.** Specs, the plan and the implementation are done with Claude Code through the `sdd` MCP server and the `/sdd-*` commands. `sdd` lints, approves, verifies, commits one squashed commit per group on branch `sdd/<feature>`, stops for your review after each group, and validates the result (integration tests, spec ↔ plan ↔ code consistency, `report.md`). Existing projects are adopted with `/sdd-adopt`, which documents the current code as baseline specs without changing it. Next: integrations for more agents (M8). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -70,6 +70,7 @@ Editing an approved spec sends it back to drafting and marks every artifact deri
 
 ## Documentation
 
+- [docs/MANUAL.html](docs/MANUAL.html) ([español](docs/MANUAL.es.html)): illustrated user manual, the place to start (open it in a browser)
 - [docs/BRIEF.md](docs/BRIEF.md): goals, constraints and architecture
 - [docs/WORKFLOW.md](docs/WORKFLOW.md): the four phases, state machine and commands
 - [docs/SPEC_GUIDELINES.md](docs/SPEC_GUIDELINES.md): spec guardrails and ID conventions

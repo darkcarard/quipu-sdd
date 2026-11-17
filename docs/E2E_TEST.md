@@ -90,7 +90,7 @@ Repeat `/sdd-implement <feature>` for each group until the plan is done.
 
 ## 7. Validate
 ```sh
-sdd validate <feature>          # writes specs/<feature>/report.md
+sdd validate <feature>          # writes .sdd/features/<feature>/report.md
 sdd trace --matrix <feature>
 git log --format='%h %s%n%(trailers)' sdd/<feature>
 ```
