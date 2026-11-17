@@ -35,7 +35,7 @@ func New(a *app.App) *mcp.Server {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "status",
-		Description: "Show the phase of every feature, or the detailed status of one feature (artifact statuses, lint counts, approvals) and the next step.",
+		Description: "Phase and next step of every feature, or detailed status of one.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in featureArg) (*mcp.CallToolResult, any, error) {
 		if in.Feature == "" {
@@ -47,18 +47,16 @@ func New(a *app.App) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "guide",
-		Description: "Get the instructions, format rules and template for drafting an artifact. " +
-			"Topics: workflow (how to work with sdd), functional, technical, plan, implement. Pass a feature to include its current status (and, for plan, the checklist of IDs to cover). Call it before drafting.",
+		Name:        "guide",
+		Description: "Drafting rules and template for a topic: workflow, functional, technical, plan (adds the coverage checklist) or implement. Pass the feature for its status. Call before drafting.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in guideArgs) (*mcp.CallToolResult, any, error) {
 		return text(a.Guide(in.Topic, in.Feature))
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "spec_new",
-		Description: "Create a feature and its functional spec from the template (text may be free text such as the user's own words; " +
-			"a valid feature name is derived from it), or, with technical=true, the technical spec of an existing feature whose functional spec is approved.",
+		Name:        "spec_new",
+		Description: "Create a feature and its functional spec (text: the feature name or the user's description of it), or with technical=true its technical spec.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in specNewArgs) (*mcp.CallToolResult, any, error) {
 		if in.Text == "" && in.Name == "" {
 			return nil, nil, errors.New("pass text (the feature name or its title) or name")
@@ -71,16 +69,15 @@ func New(a *app.App) *mcp.Server {
 
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "plan_new",
-		Description: "Create plan.md for a feature whose technical spec is approved, from the template, with the source hashes stamped.",
+		Description: "Create plan.md for a feature whose specs are approved.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
 		c, err := as(a, req).NewPlan(ctx, in.Feature)
 		return text(app.FormatCreated(c), err)
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "lint",
-		Description: "Run the deterministic guardrail checks on a feature's specs and plan (or on every feature). " +
-			"Errors block approval; fix them after every edit.",
+		Name:        "lint",
+		Description: "Check a feature's specs and plan (or all features). Errors block approval: run after every edit.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in featureArg) (*mcp.CallToolResult, any, error) {
 		r, err := a.Lint(in.Feature)
@@ -88,9 +85,8 @@ func New(a *app.App) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "sync_check",
-		Description: "Check consistency between a feature's artifacts (or every feature's): the technical spec maps every requirement and criterion, " +
-			"the plan covers them, recorded hashes match, nothing was edited after approval, and (once implemented) each group has one commit and every criterion a test.",
+		Name:        "sync_check",
+		Description: "Check consistency between a feature's specs, plan and code (or all features).",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in featureArg) (*mcp.CallToolResult, any, error) {
 		r, err := a.Sync(ctx, in.Feature)
@@ -98,9 +94,8 @@ func New(a *app.App) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "trace",
-		Description: "Follow an ID (FR-001, AC-002, ADR-001, G1, T1.2; optionally <feature>/<ID>) through the specs and the plan. " +
-			"With matrix=true, id is a feature and the whole traceability matrix is returned in markdown.",
+		Name:        "trace",
+		Description: "Follow an ID (FR-001, AC-002, T1.2, optionally feature/ID) through specs, plan, commits and tests. With matrix=true, id is a feature.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in traceArgs) (*mcp.CallToolResult, any, error) {
 		if in.Matrix {
@@ -110,19 +105,16 @@ func New(a *app.App) *mcp.Server {
 		return text(app.FormatTrace(entries), err)
 	})
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "task_next",
-		Description: "Implementation: get the next step for a feature being implemented. Returns the task to implement (with the spec text it covers, " +
-			"its files, the worktree path, the commands and the language profile), the user's revision feedback, a request to call group_verify, " +
-			"or a reason to stop (the group awaits the user's review, or it failed). Resumes an interrupted task.",
+		Name:        "task_next",
+		Description: "Implementation: next step for a feature. Returns a task to implement, the user's revision feedback, a request to call group_verify, or a reason to stop.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
 		n, err := as(a, req).TaskNext(ctx, in.Feature)
 		return text(app.FormatNext(n), err)
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "task_done",
-		Description: "Implementation: report the current task as finished. sdd runs the build command in the worktree; if it passes it commits a " +
-			"checkpoint and marks the task done, otherwise the task stays in progress and the build output is returned.",
+		Name:        "task_done",
+		Description: "Implementation: finish the current task. sdd builds; on success it checkpoints, otherwise returns the build output.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in taskDoneArgs) (*mcp.CallToolResult, any, error) {
 		d, err := as(a, req).TaskDone(ctx, in.Feature, in.Summary)
 		if err == nil && !d.Passed {
@@ -132,9 +124,8 @@ func New(a *app.App) *mcp.Server {
 	})
 
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "group_verify",
-		Description: "Implementation: once every task of the group is done (or the user's feedback is addressed), run build, lint and test in the " +
-			"worktree. On success sdd squashes the group into one commit and the group waits for the user's review: stop then. On failure fix and call it again.",
+		Name:        "group_verify",
+		Description: "Implementation: when the group's tasks are done, run build, lint and test. On success the group is committed and waits for the user's review: stop. On failure, fix and retry.",
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
 		v, err := as(a, req).GroupVerify(ctx, in.Feature)
 		if err == nil && !v.Passed {
@@ -143,9 +134,8 @@ func New(a *app.App) *mcp.Server {
 		return text(app.FormatVerified(v), err)
 	})
 	mcp.AddTool(s, &mcp.Tool{
-		Name: "review_context",
-		Description: "Validation: get the brief for a deep (semantic) review of an implemented feature: every acceptance criterion with its tasks, " +
-			"commits and tests, where the code is, and the format of the review file to write. The review is informational and never blocks a gate.",
+		Name:        "review_context",
+		Description: "Validation: brief for a deep review of an implemented feature (criteria with their tasks, commits and tests). Informational only.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
 		return text(a.ReviewContext(ctx, in.Feature))
@@ -154,34 +144,34 @@ func New(a *app.App) *mcp.Server {
 }
 
 type taskDoneArgs struct {
-	Feature string `json:"feature" jsonschema:"the feature being implemented"`
-	Summary string `json:"summary,omitempty" jsonschema:"one line on what the task changed, shown to the user in the review"`
+	Feature string `json:"feature" jsonschema:"feature name or title"`
+	Summary string `json:"summary,omitempty" jsonschema:"one line on what changed (shown in the review)"`
 }
 
 type featureArg struct {
-	Feature string `json:"feature,omitempty" jsonschema:"a feature name, title or the text it was created from; omit for every feature"`
+	Feature string `json:"feature,omitempty" jsonschema:"feature name or title; omit for all"`
 }
 
 type requiredFeatureArg struct {
-	Feature string `json:"feature" jsonschema:"a feature name, title or the text it was created from"`
+	Feature string `json:"feature" jsonschema:"feature name or title"`
 }
 
 type guideArgs struct {
 	Topic   string `json:"topic" jsonschema:"workflow, functional, technical, plan or implement"`
-	Feature string `json:"feature,omitempty" jsonschema:"a feature whose current status to include"`
+	Feature string `json:"feature,omitempty" jsonschema:"feature whose status to include"`
 }
 
 type specNewArgs struct {
-	Text        string `json:"text,omitempty" jsonschema:"the feature name, or free text such as the user's description of it (a name is derived from it)"`
-	Name        string `json:"name,omitempty" jsonschema:"an explicit feature name (kebab-case), overriding the derived one"`
-	Title       string `json:"title,omitempty" jsonschema:"human-readable title (default: the free text)"`
-	Description string `json:"description,omitempty" jsonschema:"one-line description of the feature"`
-	Technical   bool   `json:"technical,omitempty" jsonschema:"create the technical spec of an existing feature instead"`
+	Text        string `json:"text,omitempty" jsonschema:"feature name, or free text to derive it from"`
+	Name        string `json:"name,omitempty" jsonschema:"explicit kebab-case name"`
+	Title       string `json:"title,omitempty" jsonschema:"title (default: the text)"`
+	Description string `json:"description,omitempty" jsonschema:"one-line description"`
+	Technical   bool   `json:"technical,omitempty" jsonschema:"create the technical spec instead"`
 }
 
 type traceArgs struct {
-	ID     string `json:"id" jsonschema:"the ID to trace, optionally as <feature>/<ID>; with matrix, a feature"`
-	Matrix bool   `json:"matrix,omitempty" jsonschema:"return the traceability matrix of the feature named by id"`
+	ID     string `json:"id" jsonschema:"ID, feature/ID, or (with matrix) a feature"`
+	Matrix bool   `json:"matrix,omitempty" jsonschema:"return the feature's matrix"`
 }
 
 // text returns a successful text result, or the error as a tool error.

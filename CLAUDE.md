@@ -18,7 +18,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M4 (Plan): done.** `guide plan` with a coverage checklist built from the approved specs (IDs with their components/test levels, file limit, Architecture, language), `/sdd-plan` skill, plan layer check against the technical Architecture (`plan.CheckLayers`, warning). Next-step texts point to the agent commands and say approvals are the user's.
 - **M5 (Implement): done.** `internal/workspace` (git CLI: worktree ensure/repair, checkpoints, squash with trailers, diff, reset, log), `internal/verify` (technical-spec commands with timeout, process-group kill, output tail), `internal/implement` (group/task state machine: `Start`, `TaskNext`, `TaskDone`, `GroupVerify`, `ReviewGroup`, `ApproveGroup`, `ReviseGroup`, `Resume`, `Clean`). CLI `implement`, `task next|done`, `group verify`, `review`, `approve`, `revise`, `resume`, `clean`; MCP `task_next`, `task_done`, `group_verify`; `/sdd-implement`; `guide implement`. After an approval the agent's `task_next` starts the next group. `FindRoot` maps a worktree to its owning project.
 - **M6 (Validate): done.** `internal/validate`: `CheckCode` (one commit per group with matching trailers on `sdd/<feature>`, commits without trailers, `covers:` references found with `git grep`, every AC of an approved group tested), `Index` (trace with commits and tests), `Validate` (integration in the worktree, all sync checks, `report.md`, phase `validated`), `ReviewContext`. CLI `validate`, `review --context`; `sync check` and `trace` include code; MCP `review_context`; `/sdd-deep-review`.
-- **Next: M7.** Brownfield adoption (`adopt_context`, baseline features, `/sdd-adopt`). Also pending: a review of how verbose agent-facing outputs are (token cost), and the end-to-end test in a real Claude Code session.
+- **Token economy of agent-facing output: done.** Profile sent once per group (and on resume), one-line rules in `task_next`, `limits.output_tail` (6000 chars) for failing command output, guides omit the template once the file exists, shorter MCP tool descriptions. Measured: later `task_next` ~700→~230 tokens, tool catalog ~1590→~1160, worst failure output ~4000→~1500.
+- **Next: M7.** Brownfield adoption (`adopt_context`, baseline features, `/sdd-adopt`). Also pending: the end-to-end test in a real Claude Code session.
 
 Update this section whenever a milestone is completed.
 
@@ -30,6 +31,7 @@ Update this section whenever a milestone is completed.
 - The binary is installed once; each project is set up with `sdd init`. Specs, the plan, state and the journal are committed inside that project.
 - `sdd init` never modifies an existing file (not even `.gitignore`: ephemeral paths go in `.sdd/.gitignore`). It creates what is missing and prints snippets for the rest. Existing projects are adopted as baseline specs without touching their code.
 - Keep dependencies minimal: stdlib plus `gopkg.in/yaml.v3`, and the official MCP Go SDK from M3.
+- Agent-facing output (MCP tool results, guides, tool descriptions, skills) is paid for in the agent's tokens: keep it compact, send large context once, and measure before adding to it.
 - (API mode, parked) Anthropic requests use API version `2026-10-21` (no `temperature`/`top_p`/`top_k`), adaptive thinking with explicit `effort`, automatic prompt caching and, on supported models, server-side refusal `fallbacks`. Conversations are append-only: assistant blocks keep their wire form in `ContentBlock.Raw` and are replayed byte for byte.
 
 ## Conventions

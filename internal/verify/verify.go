@@ -15,8 +15,16 @@ import (
 	"time"
 )
 
-// MaxOutput is how much of a command's combined output is kept (its tail).
-const MaxOutput = 16 * 1024
+// DefaultTail is how many characters of a command's combined output are kept
+// (its tail) unless Options.Tail says otherwise. The output goes back to the
+// agent on failure, so it is bounded to keep its token cost low.
+const DefaultTail = 6000
+
+// Options control how steps run.
+type Options struct {
+	Timeout time.Duration // per step; 0 means none
+	Tail    int           // characters of output kept; 0 means DefaultTail
+}
 
 // Step is one command to run.
 type Step struct {
@@ -37,13 +45,13 @@ type Result struct {
 
 // Run executes steps in order in dir and stops at the first failure. A step
 // with an empty command is skipped.
-func Run(ctx context.Context, dir string, timeout time.Duration, steps ...Step) ([]Result, bool) {
+func Run(ctx context.Context, dir string, opts Options, steps ...Step) ([]Result, bool) {
 	var out []Result
 	for _, s := range steps {
 		if strings.TrimSpace(s.Command) == "" {
 			continue
 		}
-		r := runOne(ctx, dir, timeout, s)
+		r := runOne(ctx, dir, opts, s)
 		out = append(out, r)
 		if !r.Passed {
 			return out, false
@@ -52,7 +60,8 @@ func Run(ctx context.Context, dir string, timeout time.Duration, steps ...Step) 
 	return out, true
 }
 
-func runOne(ctx context.Context, dir string, timeout time.Duration, s Step) Result {
+func runOne(ctx context.Context, dir string, opts Options, s Step) Result {
+	timeout := opts.Timeout
 	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -72,7 +81,7 @@ func runOne(ctx context.Context, dir string, timeout time.Duration, s Step) Resu
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	start := time.Now()
 	err := cmd.Run()
-	r := Result{Name: s.Name, Command: s.Command, Duration: time.Since(start).Round(time.Millisecond), Output: tail(buf.String())}
+	r := Result{Name: s.Name, Command: s.Command, Duration: time.Since(start).Round(time.Millisecond), Output: tail(buf.String(), opts.Tail)}
 	var exit *exec.ExitError
 	switch {
 	case err == nil:
@@ -89,11 +98,14 @@ func runOne(ctx context.Context, dir string, timeout time.Duration, s Step) Resu
 	return r
 }
 
-func tail(s string) string {
-	if len(s) <= MaxOutput {
+func tail(s string, n int) string {
+	if n <= 0 {
+		n = DefaultTail
+	}
+	if len(s) <= n {
 		return s
 	}
-	cut := s[len(s)-MaxOutput:]
+	cut := s[len(s)-n:]
 	if i := strings.IndexByte(cut, '\n'); i >= 0 && i < 200 {
 		cut = cut[i+1:]
 	}

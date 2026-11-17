@@ -42,7 +42,9 @@ type project struct {
 	limits config.Limits
 }
 
-func setup(t *testing.T) *project {
+func setup(t *testing.T) *project { return setupPlan(t, sddtest.Plan) }
+
+func setupPlan(t *testing.T, planText string) *project {
 	t.Helper()
 	root := t.TempDir()
 	l := state.Layout{Root: root}
@@ -70,7 +72,7 @@ func setup(t *testing.T) *project {
 	tech = tech[:i] + technical + tech[j:]
 	os.WriteFile(filepath.Join(dir, "functional.md"), []byte(sddtest.Functional), 0o644)
 	os.WriteFile(filepath.Join(dir, "technical.md"), []byte(tech), 0o644)
-	os.WriteFile(filepath.Join(dir, "plan.md"), []byte(sddtest.Plan), 0o644)
+	os.WriteFile(filepath.Join(dir, "plan.md"), []byte(planText), 0o644)
 	p := &project{t: t, l: l, limits: config.Limits{MaxFixAttempts: 3, CommandTimeout: 30 * time.Second, MaxFilesPerTask: 5}}
 	for _, a := range workflow.Artifacts() {
 		if ds, err := p.load().Approve(a, user, now); err != nil {
@@ -352,6 +354,36 @@ func TestImplementationCycle(t *testing.T) {
 	}
 	if out, _ := (workspace.Git{Dir: p.l.Root}).Run(ctx, "status", "--porcelain"); strings.Contains(out, "worktrees") {
 		t.Errorf("the worktree must be ignored by the main repository:\n%s", out)
+	}
+}
+
+// TestProfileOncePerGroup keeps task_next small: the language profile goes
+// with the first task of a group and with a resumed task, not with every task.
+func TestProfileOncePerGroup(t *testing.T) {
+	ctx := context.Background()
+	plan := strings.Replace(sddtest.Plan, "Create the entity.\n", `Create the entity.
+
+### T1.2: Entity validation
+- covers: [AC-001]
+- files: [internal/signup/validate.go]
+- done_when: invalid emails are rejected
+- verify: TestValidate
+`, 1)
+	p := setupPlan(t, plan)
+	if _, err := Start(ctx, p.session(user)); err != nil {
+		t.Fatal(err)
+	}
+	n := p.next()
+	if n.Task.ID != "T1.1" || n.Task.Profile == "" {
+		t.Fatalf("the first task of a group carries the profile: %+v", n.Task)
+	}
+	p.finishTask("internal/signup/user.go")
+	n = p.next()
+	if n.Task.ID != "T1.2" || n.Task.Profile != "" || n.Task.ProfilePath != ".sdd/profiles/go.md" {
+		t.Errorf("later tasks get only the profile path: %+v", n.Task)
+	}
+	if n := p.next(); !n.Resumed || n.Task.Profile == "" {
+		t.Errorf("a resumed task carries the profile again (new session): %+v", n.Task)
 	}
 }
 

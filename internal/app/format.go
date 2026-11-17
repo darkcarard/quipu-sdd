@@ -258,16 +258,12 @@ func FormatNext(n implement.Next) string {
 		if len(n.Dirty) > 0 {
 			fmt.Fprintf(&sb, "Uncommitted changes in the worktree: %s\n", strings.Join(n.Dirty, ", "))
 		}
-		sb.WriteString(`
-Rules:
-- Edit files only inside the worktree above, never in the main checkout.
-- Do not commit: sdd makes the commits.
-- Touch only the declared files where possible; any other changed file is reported to the user.
-- Write unit tests for the criteria and reference them in a comment (` + "`covers: AC-###`" + `).
-- When the task is done, call task_done with a one-line summary.
-`)
-		if t.Profile != "" {
+		sb.WriteString("Rules: edit only in the worktree, never commit, keep to the declared files, mark tests with `covers: AC-###` (see `guide implement`).\n")
+		switch {
+		case t.Profile != "":
 			fmt.Fprintf(&sb, "\nLanguage profile (%s):\n\n%s\n", t.ProfilePath, strings.TrimSpace(stripFrontmatter(t.Profile)))
+		case t.ProfilePath != "":
+			fmt.Fprintf(&sb, "Language profile: %s (sent with the group's first task; read it if you no longer have it)\n", t.ProfilePath)
 		}
 	case implement.NextRevision:
 		fmt.Fprintf(&sb, "\nThe user asked for changes:\n\n%s\n\nWorktree: %s\nChanges in this group so far:\n%s\n", n.Feedback, n.Worktree, n.DiffStat)

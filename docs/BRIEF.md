@@ -78,6 +78,9 @@ These limits are configurable in `sdd.yaml`:
 * Maximum files per task (plan validation).
 * Maximum fix attempts per group verification.
 * Timeout for each verification command.
+* How much of a failing command's output is returned to the agent (`output_tail`).
+
+Agent-facing output is kept compact on purpose, because it is read by the agent and costs tokens: guides leave out templates once the file exists, the language profile is sent once per group, and failure output is cut to its tail.
 
 ### Security and Enforcement
 `sdd` cannot sandbox the host agent: file access, shell access and network access are governed by the agent's own permission system. What `sdd` guarantees deterministically:

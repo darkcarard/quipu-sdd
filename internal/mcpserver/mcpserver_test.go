@@ -141,6 +141,9 @@ func TestDraftingThroughMCP(t *testing.T) {
 			t.Errorf("guide missing %q (error %v)", want, isErr)
 		}
 	}
+	if strings.Contains(out, "````markdown") || !strings.Contains(out, "The file already exists: read it") {
+		t.Error("the template is left out once the file exists")
+	}
 
 	out, isErr = call(t, cs, "trace", map[string]any{"id": "AC-002"})
 	if isErr || !strings.Contains(out, "AC-002  (user-signup") {

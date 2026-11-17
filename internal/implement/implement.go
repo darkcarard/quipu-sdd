@@ -288,7 +288,7 @@ type Brief struct {
 	Covers                 []Covered
 	Language               string
 	ProfilePath            string
-	Profile                string
+	Profile                string // empty when the agent already got it with an earlier task
 	Commands               spec.Commands
 }
 
@@ -345,14 +345,19 @@ func TaskNext(ctx context.Context, s *Session) (Next, error) {
 			continue
 		}
 		f.State.Current = state.Cursor{Group: g.ID, Task: t.ID}
-		brief, err := s.brief(t.ID)
+		// The language profile goes with the group's first task and with a
+		// resumed task (a new session); other tasks get only its path.
+		brief, err := s.brief(t.ID, i == 0 || out.Resumed)
 		if err != nil {
 			return out, err
 		}
 		out.Task = &brief
-		out.Message = "implement this task in the worktree, then call task_done"
+		out.Message = "implement this task in the worktree, then call task_done with a one-line summary"
 		if out.Resumed {
-			out.Message = "this task was already in progress; the uncommitted changes listed are from that attempt: continue from them, then call task_done"
+			out.Message = "this task is already in progress: continue it, then call task_done with a one-line summary"
+			if len(dirty) > 0 {
+				out.Message = "this task was already in progress; the uncommitted changes listed are from that attempt: continue from them, then call task_done"
+			}
 		}
 		return out, s.save()
 	}
@@ -369,7 +374,7 @@ func TaskNext(ctx context.Context, s *Session) (Next, error) {
 	return out, s.save()
 }
 
-func (s *Session) brief(taskID string) (Brief, error) {
+func (s *Session) brief(taskID string, withProfile bool) (Brief, error) {
 	f := s.F
 	pt, _, ok := f.Plan.Task(taskID)
 	if !ok {
@@ -406,7 +411,7 @@ func (s *Session) brief(taskID string) (Brief, error) {
 					return string(data), err
 				}
 			}
-			if p, err := read(lang); err == nil {
+			if p, err := read(lang); err == nil && withProfile {
 				b.Profile = p
 			}
 		}
@@ -426,6 +431,10 @@ func (s *Session) current() (*state.GroupState, *state.TaskState, error) {
 		}
 	}
 	return g, nil, nil
+}
+
+func (s *Session) verifyOptions() verify.Options {
+	return verify.Options{Timeout: s.Limits.CommandTimeout, Tail: s.Limits.OutputTail}
 }
 
 func (s *Session) steps(names ...string) []verify.Step {
@@ -483,7 +492,7 @@ func TaskDone(ctx context.Context, s *Session, summary string) (Done, error) {
 	if err != nil {
 		return out, err
 	}
-	results, ok := verify.Run(ctx, wt.Dir, s.Limits.CommandTimeout, s.steps("build")...)
+	results, ok := verify.Run(ctx, wt.Dir, s.verifyOptions(), s.steps("build")...)
 	out.Results, out.Passed = results, ok
 	if !ok {
 		t.Attempts++
@@ -579,7 +588,7 @@ func GroupVerify(ctx context.Context, s *Session) (Verified, error) {
 	if err != nil {
 		return out, err
 	}
-	results, ok := verify.Run(ctx, wt.Dir, s.Limits.CommandTimeout, s.steps("build", "lint", "test")...)
+	results, ok := verify.Run(ctx, wt.Dir, s.verifyOptions(), s.steps("build", "lint", "test")...)
 	out.Results, out.Passed = results, ok
 	g.Verification = verify.Summary(results)
 	if !ok {

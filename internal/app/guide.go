@@ -11,6 +11,7 @@ import (
 
 	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/templates"
+	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
 //go:embed guides/*.md
@@ -58,11 +59,23 @@ func (a *App) Guide(topic, arg string) (string, error) {
 	var sb strings.Builder
 	sb.Write(b)
 
-	tpl, err := a.template(topic + ".md")
-	if err != nil {
-		return "", err
+	// The template is only useful before the file exists; afterwards the agent
+	// reads the file itself, so it is left out to save tokens.
+	exists := false
+	if arg != "" {
+		if f, err := a.Load(arg); err == nil {
+			exists = f.Files[workflow.Artifact(topic)].Exists
+		}
 	}
-	fmt.Fprintf(&sb, "\n## Template\n\nNew files start from this template (`.sdd/templates/%s.md`); `{{feature}}` and `{{title}}` are filled in on creation.\n\n````markdown\n%s````\n", topic, tpl)
+	if exists {
+		fmt.Fprintf(&sb, "\n## Template\n\nThe file already exists: read it instead of the template (`.sdd/templates/%s.md`).\n", topic)
+	} else {
+		tpl, err := a.template(topic + ".md")
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&sb, "\n## Template\n\nNew files start from this template (`.sdd/templates/%s.md`); `{{feature}}` and `{{title}}` are filled in on creation.\n\n````markdown\n%s````\n", topic, tpl)
+	}
 
 	if arg != "" {
 		d, err := a.Status(arg)

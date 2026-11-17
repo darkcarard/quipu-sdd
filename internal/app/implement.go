@@ -7,6 +7,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/implement"
 	"github.com/darkcarard/sdd-framework/internal/lock"
 	"github.com/darkcarard/sdd-framework/internal/validate"
+	"github.com/darkcarard/sdd-framework/internal/verify"
 )
 
 // implementing runs fn on a fresh session of the feature, under its lock.
@@ -96,7 +97,7 @@ func (a *App) Clean(ctx context.Context, arg string, force bool) (msg string, er
 // feature and writes its report.
 func (a *App) Validate(ctx context.Context, arg string) (out validate.Result, err error) {
 	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) {
-		out, e = validate.Validate(ctx, s.F, s.Who, s.Now, a.Config.Limits.CommandTimeout)
+		out, e = validate.Validate(ctx, s.F, s.Who, s.Now, verify.Options{Timeout: a.Config.Limits.CommandTimeout, Tail: a.Config.Limits.OutputTail})
 		return
 	})
 	return

@@ -257,7 +257,7 @@ type Result struct {
 // Validate runs the integration tests and every sync check of an implemented
 // feature, writes report.md and, when everything passes, moves the feature to
 // validated.
-func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now time.Time, timeout time.Duration) (Result, error) {
+func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now time.Time, opts verify.Options) (Result, error) {
 	var out Result
 	switch f.Phase {
 	case workflow.Implemented, workflow.Validated:
@@ -281,7 +281,7 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 	if err != nil {
 		return out, err
 	}
-	results, ok := verify.Run(ctx, wt.Dir, timeout, verify.Step{Name: "integration", Command: f.Technical.Commands.Integration})
+	results, ok := verify.Run(ctx, wt.Dir, opts, verify.Step{Name: "integration", Command: f.Technical.Commands.Integration})
 	out.Integration, out.Skipped = results, len(results) == 0
 
 	ix, codeDs, err := Index(ctx, f)

@@ -159,7 +159,7 @@ Validation (deterministic):
 | `sdd clean <feature> [--force]` | **user** | Remove the worktree; the branch and its commits are kept, and the next command that needs the worktree recreates it |
 
 For each group:
-1. `task_next` returns the next pending task, or the one still in progress after an interruption: its description, `files`, `done_when`, `verify`, the text of every FR and AC it covers, the language profile `.sdd/profiles/<language>.md` and the worktree path. The task becomes `in-progress`.
+1. `task_next` returns the next pending task, or the one still in progress after an interruption: its description, `files`, `done_when`, `verify`, the text of every FR and AC it covers, the worktree path and the language profile `.sdd/profiles/<language>.md`. To keep the agent's context small, the profile's content goes only with the first task of each group and with a resumed task; other tasks get its path. The task becomes `in-progress`.
 2. The agent implements the task in the worktree, with unit tests that reference the criteria (`covers: AC-###`).
 3. `task_done` runs the technical spec's `build` command in the worktree. If it fails, the output goes back to the agent and the task stays in progress. If it passes, `sdd` makes a **WIP checkpoint commit**, marks the task `done` and reports any changed file that the task did not declare.
 4. When every task is done, `group_verify` runs `build`, `lint` and `test`. A failure goes back to the agent to fix and counts as one fix attempt; after `limits.max_fix_attempts` the group is marked `failed` and the agent stops and tells the user.
@@ -177,7 +177,7 @@ For each group:
 
 The agent never commits itself, and a group never advances while the code fails to build or its tests fail. After `sdd revise`, `task_next` returns the feedback (and the group's changes so far) instead of a task; the agent addresses it and calls `group_verify` again, which squashes the group into a single commit once more. A `failed` group also goes back to the agent through `sdd revise`, with guidance. If a spec or the plan is edited during implementation, the feature leaves `implementing` (it becomes stale) and every implementation command stops until the artifacts are re-approved.
 
-The verification commands run with the project's own shell (`sh -c`, or `cmd /C` on Windows) in the worktree and are killed, with their child processes, after `limits.command_timeout`. The last 16 KB of their output are kept for the agent and the review.
+The verification commands run with the project's own shell (`sh -c`, or `cmd /C` on Windows) in the worktree and are killed, with their child processes, after `limits.command_timeout`. Only the tail of a failing command's output goes back to the agent and into the review: `limits.output_tail` characters (6000 by default), which bounds the token cost of failures.
 
 ## Phase 4: Validate (integration + synchronization)
 

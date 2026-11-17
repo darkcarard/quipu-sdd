@@ -16,6 +16,7 @@ import (
 	"github.com/darkcarard/sdd-framework/internal/sddtest"
 	"github.com/darkcarard/sdd-framework/internal/state"
 	"github.com/darkcarard/sdd-framework/internal/templates"
+	"github.com/darkcarard/sdd-framework/internal/verify"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 	"github.com/darkcarard/sdd-framework/internal/workspace"
 )
@@ -134,7 +135,7 @@ func TestValidate(t *testing.T) {
 
 	// A failing integration test fails the validation and the report says why.
 	p.put("INTEG_FAIL", "x")
-	r, err := Validate(ctx, p.load(), user, now, time.Minute)
+	r, err := Validate(ctx, p.load(), user, now, verify.Options{Timeout: time.Minute})
 	if err != nil || r.Passed {
 		t.Fatalf("failing integration: %+v %v", r, err)
 	}
@@ -147,7 +148,7 @@ func TestValidate(t *testing.T) {
 	}
 	os.Remove(filepath.Join(p.l.WorktreeDir(sddtest.Feature), "INTEG_FAIL"))
 
-	r, err = Validate(ctx, p.load(), user, now, time.Minute)
+	r, err = Validate(ctx, p.load(), user, now, verify.Options{Timeout: time.Minute})
 	if err != nil || !r.Passed {
 		t.Fatalf("Validate: %+v %v", r, err)
 	}
@@ -211,7 +212,7 @@ func TestCodeChecksFindProblems(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	r, err := Validate(ctx, p.load(), user, now, time.Minute)
+	r, err := Validate(ctx, p.load(), user, now, verify.Options{Timeout: time.Minute})
 	if err != nil || r.Passed {
 		t.Errorf("validation must fail: %+v %v", r, err)
 	}
@@ -228,7 +229,7 @@ func TestValidateNeedsImplementation(t *testing.T) {
 	p := implemented(t)
 	f := p.load()
 	f.SetPhase(workflow.Implementing)
-	if _, err := Validate(context.Background(), f, user, now, time.Minute); err == nil || !strings.Contains(err.Error(), "every group approved") {
+	if _, err := Validate(context.Background(), f, user, now, verify.Options{Timeout: time.Minute}); err == nil || !strings.Contains(err.Error(), "every group approved") {
 		t.Errorf("err = %v", err)
 	}
 }

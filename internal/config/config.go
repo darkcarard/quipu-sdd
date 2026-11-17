@@ -69,7 +69,10 @@ type Limits struct {
 	MaxRetries           int           `yaml:"max_retries"`
 	RequestTimeout       time.Duration `yaml:"request_timeout"`
 	CommandTimeout       time.Duration `yaml:"command_timeout"`
-	TokenBudget          int           `yaml:"token_budget"` // 0 = unlimited
+	// OutputTail is how many characters of a failing command's output are
+	// returned to the agent and kept in the review (0: the default, 6000).
+	OutputTail  int `yaml:"output_tail"`
+	TokenBudget int `yaml:"token_budget"` // 0 = unlimited
 }
 
 // MCPServer is an MCP server spawned over stdio. Only tools listed in AllowTools
@@ -102,6 +105,7 @@ func Default() Config {
 			MaxFixAttempts:  3,
 			MaxFilesPerTask: 5,
 			CommandTimeout:  10 * time.Minute,
+			OutputTail:      6000,
 		},
 	}
 }
@@ -116,6 +120,7 @@ limits:
   max_files_per_task: 5       # plan validation: keeps tasks reviewable
   max_fix_attempts: 3         # group verification failures before the group is marked failed
   command_timeout: 10m        # build, lint and test commands are killed after this long
+  output_tail: 6000           # characters of a failing command's output returned to the agent
 `, version.LayoutVersion)
 }
 
@@ -209,6 +214,9 @@ func (c Config) Validate() error {
 		if _, err := regexp.Compile(p); err != nil {
 			errs = append(errs, fmt.Errorf("audit.redact_patterns[%d]: %w", i, err))
 		}
+	}
+	if c.Limits.OutputTail < 0 {
+		errs = append(errs, errors.New("limits.output_tail: must be >= 0"))
 	}
 	if c.Limits.MaxFixAttempts < 0 {
 		errs = append(errs, errors.New("limits.max_fix_attempts: must be >= 0"))
