@@ -52,6 +52,7 @@ func (a *App) commands() []command {
 		{name: "init", summary: "Install the SDD framework in the current project", run: (*App).runInit},
 		{name: "version", summary: "Print the sdd version", run: (*App).runVersion},
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
+		{name: "feature", summary: "Show or change a feature's title and description", run: (*App).runFeature},
 		{name: "spec", summary: "Create, lint and approve specs (agent chat in M3)", run: (*App).runSpec},
 		{name: "plan", summary: "Create and approve the implementation plan (agent generation in M4)", run: (*App).runPlan},
 		{name: "implement", summary: "Implement the next task group in an isolated worktree", milestone: "M5"},

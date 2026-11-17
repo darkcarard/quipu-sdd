@@ -42,7 +42,7 @@ An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqual
 |---|---|
 | `seq` | Monotonic sequence number per feature |
 | `actor` | `user:<git user.email>` or `agent:<model>` |
-| `action` | e.g. `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `plan.generate`, `task.run`, `group.verify`, `group.committed`, `group.approved` |
+| `action` | e.g. `feature.describe`, `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `plan.generate`, `task.run`, `group.verify`, `group.committed`, `group.approved` |
 | `status` | `started`, `completed`, `failed` (see write-ahead below) or `info` for standalone events |
 | `ref` | On `completed` or `failed`: the `seq` of the matching `started` event |
 | `hashes` | Hashes of the artifacts involved. Every approval records the exact hash it approved |

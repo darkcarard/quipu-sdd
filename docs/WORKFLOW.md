@@ -137,6 +137,7 @@ Sync levels, each applied as soon as its artifacts exist:
 
 ```
 sdd init | version | status [<feature>] | upgrade
+sdd feature describe <feature> [--title "<title>"] [--description "<text>"]
 sdd spec new|chat|lint|approve
 sdd plan <feature> | plan new <feature> | plan approve <feature>
 sdd implement | review | approve | revise | resume | clean <feature>

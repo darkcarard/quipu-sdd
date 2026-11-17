@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/darkcarard/sdd-framework/internal/config"
+	"github.com/darkcarard/sdd-framework/internal/journal"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
@@ -54,7 +55,11 @@ func TestSlugify(t *testing.T) {
 		{"  multiple   spaces__and--dashes ", "multiple-spaces-and-dashes", ""},
 		{"Straße Œuvre Ærø", "strasse-oeuvre-aero", ""},
 		{"api 日本語 v2", "api-v2", ""},
-		{"Integración con el sistema de facturación electrónica de la DIAN", "integracion-con-el-sistema-de", ""},
+		{"Integración con el sistema de facturación electrónica de la DIAN", "integracion-con-el-sistema", ""},
+		{"Synchronization of the customer accounts with the ERP", "synchronization-of-the-customer-accounts", ""},
+		{"Gestión de cuentas por cobrar de los clientes", "gestion-de-cuentas-por-cobrar", ""}, // "-de-los" dropped
+		{"De la A a la Z", "de-la-a-a-la-z", ""},                                               // not cut: stopwords kept
+		{"Plan A", "plan-a", ""},
 		{strings.Repeat("x", 50), strings.Repeat("x", MaxNameLen), ""},
 		{"🚀 !!", "", "cannot derive"},
 		{"NUL", "", "reserved"},
@@ -99,5 +104,45 @@ func TestResolve(t *testing.T) {
 	st, err := l.Load("registro-de-usuarios")
 	if err != nil || st.Title != "Alta de clientes" || st.Description != "d" || st.CreatedBy != who.String() || !st.CreatedAt.Equal(now) {
 		t.Errorf("state = %+v, %v", st, err)
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	l := setup(t)
+	f, _ := Open(l, config.Default(), "pagos")
+	if _, err := f.Create(workflow.Functional, Info{Title: "Pagos"}, who, now); err != nil {
+		t.Fatal(err)
+	}
+	str := func(s string) *string { return &s }
+
+	if changed, err := f.Describe(str("  Pagos   con tarjeta "), str("Cobro"), who); err != nil || !changed {
+		t.Fatalf("Describe = %v, %v", changed, err)
+	}
+	if changed, err := f.Describe(nil, str(""), who); err != nil || !changed {
+		t.Fatalf("clearing the description = %v, %v", changed, err)
+	}
+	if changed, _ := f.Describe(str("Pagos con tarjeta"), nil, who); changed {
+		t.Error("an unchanged title must not be recorded")
+	}
+	if _, err := f.Describe(str(" "), nil, who); err == nil {
+		t.Error("an empty title must be rejected")
+	}
+
+	st, _ := l.Load("pagos")
+	if st.Title != "Pagos con tarjeta" || st.Description != "" {
+		t.Errorf("state = %+v", st)
+	}
+	if got, err := Resolve(l, "pagos con TARJETA"); err != nil || got != "pagos" {
+		t.Errorf("Resolve by the new title = %q, %v", got, err)
+	}
+	events, _ := journal.Read(l.JournalFile("pagos"))
+	var details []string
+	for _, ev := range events {
+		if ev.Action == "feature.describe" {
+			details = append(details, ev.Detail)
+		}
+	}
+	if len(details) != 2 || !strings.Contains(details[0], `title "Pagos" → "Pagos con tarjeta"`) {
+		t.Errorf("journal = %q", details)
 	}
 }

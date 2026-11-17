@@ -303,3 +303,38 @@ func (f *Feature) record(ev journal.Event) error {
 	}
 	return f.RenderLog()
 }
+
+// Describe changes the title and/or description recorded in state.json; a nil
+// argument leaves that field unchanged. The title cannot be empty; an empty
+// description clears it. It returns false when nothing changed.
+func (f *Feature) Describe(title, description *string, who Identity) (bool, error) {
+	var changes []string
+	if title != nil {
+		t := strings.Join(strings.Fields(*title), " ")
+		if t == "" {
+			return false, errors.New("the title cannot be empty")
+		}
+		if t != f.Title() {
+			changes = append(changes, fmt.Sprintf("title %q → %q", f.Title(), t))
+			f.State.Title = t
+		}
+	}
+	if description != nil {
+		d := strings.TrimSpace(*description)
+		if d != f.State.Description {
+			changes = append(changes, fmt.Sprintf("description %q → %q", f.State.Description, d))
+			f.State.Description = d
+		}
+	}
+	if len(changes) == 0 {
+		return false, nil
+	}
+	if err := f.Layout.Save(f.State); err != nil {
+		return false, err
+	}
+	f.Saved = true
+	return true, f.record(journal.Event{
+		Actor: who.Actor(), Phase: string(f.Phase), Action: "feature.describe", Status: journal.Info,
+		Detail: strings.Join(changes, "; "),
+	})
+}

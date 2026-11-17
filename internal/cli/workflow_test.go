@@ -130,6 +130,15 @@ func TestFreeTextFeatureNames(t *testing.T) {
 	}
 	contains(t, mustRun(t, dir, ExitOK, "status"), "registro-de-usuarios-v2  Registro de Usuarios (v2)")
 
+	contains(t, mustRun(t, dir, ExitOK, "feature", "describe", "signup-v3", "--title", "Signup v3", "--description", "Nueva versión"),
+		"title:       Signup v3", "description: Nueva versión")
+	contains(t, mustRun(t, dir, ExitOK, "feature", "describe", "Signup V3"), "feature:     signup-v3", "created:     2026-11-17T10:00:00Z by Ada <ada@example.com>")
+	contains(t, mustRun(t, dir, ExitOK, "feature", "describe", "signup-v3", "--title", "Signup v3"), "nothing changed")
+	contains(t, mustRun(t, dir, ExitError, "feature", "describe", "signup-v3", "--title", ""), "cannot be empty")
+	if code, _, _ := runAs(t, dir, "feature", "rename", "x"); code != ExitUsage {
+		t.Errorf("unknown feature subcommand: exit %d", code)
+	}
+
 	contains(t, mustRun(t, dir, ExitError, "spec", "new", "con"), "reserved")
 	contains(t, mustRun(t, dir, ExitError, "spec", "new", "x", "--name", "approve"), "reserved")
 	contains(t, mustRun(t, dir, ExitError, "spec", "new", "¿?"), "cannot derive a feature name")

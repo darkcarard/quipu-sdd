@@ -81,21 +81,7 @@ func Slugify(text string) (string, error) {
 			sb.WriteByte(' ')
 		}
 	}
-	words := strings.Fields(sb.String())
-	slug := ""
-	for _, w := range words {
-		next := w
-		if slug != "" {
-			next = slug + "-" + w
-		}
-		if len(next) > MaxNameLen {
-			if slug == "" {
-				slug = w[:MaxNameLen]
-			}
-			break
-		}
-		slug = next
-	}
+	slug := strings.Join(shorten(strings.Fields(sb.String())), "-")
 	if slug == "" {
 		return "", fmt.Errorf("cannot derive a feature name from %q: pass one with --name", text)
 	}
@@ -106,6 +92,45 @@ func Slugify(text string) (string, error) {
 		return "", fmt.Errorf("%w: pass another name with --name", err)
 	}
 	return slug, nil
+}
+
+// trailingStopwords are dropped from the end of a name that had to be cut, so
+// "Integración con el sistema de facturación…" gives "integracion-con-el-sistema"
+// rather than "integracion-con-el-sistema-de". Spanish and English.
+var trailingStopwords = []string{
+	"a", "al", "con", "de", "del", "e", "el", "en", "la", "las", "lo", "los", "o", "para", "por",
+	"segun", "sin", "sobre", "u", "un", "una", "unas", "unos", "y",
+	"an", "and", "at", "by", "for", "from", "in", "into", "of", "on", "or", "the", "to", "via", "with",
+}
+
+// shorten keeps as many leading words as fit in MaxNameLen (joined by hyphens).
+// When words had to be dropped, trailing stopwords are dropped too.
+func shorten(words []string) []string {
+	n, size := 0, 0
+	for n < len(words) {
+		add := len(words[n])
+		if n > 0 {
+			add++ // hyphen
+		}
+		if size+add > MaxNameLen {
+			break
+		}
+		size += add
+		n++
+	}
+	switch {
+	case len(words) == 0:
+		return nil
+	case n == 0: // a single word longer than the limit
+		return []string{words[0][:MaxNameLen]}
+	case n == len(words):
+		return words
+	}
+	kept := words[:n]
+	for len(kept) > 1 && slices.Contains(trailingStopwords, kept[len(kept)-1]) {
+		kept = kept[:len(kept)-1]
+	}
+	return kept
 }
 
 // TitleFromName turns a feature name into a title ("user-signup" → "User Signup").
