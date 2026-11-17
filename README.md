@@ -1,15 +1,17 @@
 # sdd: Spec-Driven Development Framework
 
-`sdd` is a single-binary, model-agnostic CLI that drives software development from approved specifications. You work in four gated phases:
+`sdd` is a single-binary CLI that drives software development from approved specifications, together with the coding agent you already use (Claude Code first; Codex CLI, Gemini CLI and others later). `sdd` never calls an LLM itself: the agent does the reasoning under your existing subscription, and `sdd` owns the specs, the guardrails, the approval gates, verification, commits and the audit trail. The agent reaches it through a local MCP server and installed `/sdd-*` commands.
 
-1. **Specify:** write the functional spec, then the technical spec, together with the agent. You approve each one.
+You work in four gated phases:
+
+1. **Specify:** the agent drafts the functional spec, then the technical spec, with you. You approve each one.
 2. **Plan:** the agent turns the specs into layered, reviewable task groups. You approve the plan.
-3. **Implement:** the agent implements one group at a time in an isolated git worktree. It builds and tests, makes one commit per group, and waits for your review.
+3. **Implement:** the agent implements one task at a time in an isolated git worktree. `sdd` builds and tests, makes one commit per group, and waits for your review.
 4. **Validate:** integration tests run, and the specs, plan and code are checked for synchronization.
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M2 (Claude provider)**. Specs and plans are written by hand and can be linted, approved, synced and traced. The Anthropic provider (streaming, tool use, retries, usage accounting, redacted transcripts) is in place; the agent phases start with `sdd spec chat` in M3. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M1 done; M3 (agent integration) next.** Specs and plans can be written by hand and linted, approved, synced and traced. The Claude Code integration (MCP server and `/sdd-*` commands) arrives in M3. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -24,13 +26,13 @@ make install
 ```sh
 cd your-project        # a git repository
 sdd init               # creates sdd.yaml, specs/, .sdd/ and updates .gitignore
-export ANTHROPIC_API_KEY=...   # or put it in .env (git-ignored)
+                       # (from M3: sdd init --agent claude also sets up Claude Code)
 ```
 
 `sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths:
 
 ```
-sdd.yaml                     # provider, limits, MCP servers
+sdd.yaml                     # limits and settings
 specs/<feature>/             # functional.md, technical.md, plan.md
 .sdd/templates/, profiles/   # customizable templates and language profiles
 .sdd/features/<feature>/     # state.json, journal.jsonl, log.md, report.md

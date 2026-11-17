@@ -41,16 +41,14 @@ An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqual
 | Field | Meaning |
 |---|---|
 | `seq` | Monotonic sequence number per feature |
-| `actor` | `user:<git user.email>` or `agent:<model>` |
-| `action` | e.g. `feature.describe`, `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `plan.generate`, `task.run`, `group.verify`, `group.committed`, `group.approved` |
+| `actor` | `user:<git user.email>` for CLI commands, `agent:<client>` for MCP calls (the client name the agent reports, e.g. `agent:claude-code`) |
+| `action` | e.g. `feature.describe`, `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `task.start`, `task.done`, `group.verify`, `group.committed`, `group.approved`, `group.revise` |
 | `status` | `started`, `completed`, `failed` (see write-ahead below) or `info` for standalone events |
 | `ref` | On `completed` or `failed`: the `seq` of the matching `started` event |
 | `hashes` | Hashes of the artifacts involved. Every approval records the exact hash it approved |
 
-### Transcripts
-`.sdd/runs/<run-id>/transcript.jsonl` records every provider request and response and every tool call with its result. Each line has a `seq`, a `kind` (`request`, `response`, `error`, `retry`, `tool_call`, `tool_result`) and a `call` number that pairs a request or tool call with its outcome. Every attempt is recorded, including the ones that were retried.
-
-Before a line is written it is redacted: the provider API key, every environment value (process or `.env`) whose name looks like a credential (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`, `AUTH`), built-in credential patterns (Anthropic, OpenAI, Google, AWS, GitHub and Slack keys, bearer tokens, PEM private keys) and the extra regular expressions in `audit.redact_patterns` are replaced with `[REDACTED]`. The file is created with mode `0600`. The directory is git-ignored by default; set `audit.commit_transcripts: true` to version it.
+### Conversations
+The conversation with the agent (prompts, reasoning, tool calls) lives in the host agent's own session history, not in `sdd`. What `sdd` records is what it was asked to do and what it decided: every MCP tool call that changes state is journaled with the agent as actor, and every verification result is journaled with its command, exit status and a digest of its output.
 
 ## 3. Checkpoints and Recovery
 
@@ -66,13 +64,14 @@ Recovery rests on three principles:
 | `state.json` | `.sdd/features/<feature>/` | Feature title and description (the human side of the feature name), who created it and when, the approvals, the current phase, group and task, the status of each task, attempts, `run_id`, worktree, branch and last checkpoint SHA. Written atomically (temp file + `rename`) |
 | Write-ahead events | `journal.jsonl` | A `started` event is appended before an action, and a `completed` or `failed` event whose `ref` points to it is appended after. A `started` event that no other event references marks an interrupted action |
 | WIP commits | branch `sdd/<feature>` | One checkpoint commit per finished task, squashed into a single commit when the group passes |
-| Chat sessions | `.sdd/features/<feature>/sessions/` | Phase 1 conversation history. The draft spec is also saved to disk after every agent turn |
+| Artifacts on disk | `specs/<feature>/` | The agent writes specs and the plan directly to their files, so a new session continues from what is on disk |
 | Lock | `.sdd/locks/<feature>.lock` | PID, host and start time. Prevents two runs on the same feature at once |
 
 ### Failure handling
-- **Network or provider errors:** exponential backoff with jitter (1 s doubling up to 60 s, at most `limits.max_retries` retries) on connection errors, on HTTP 408, 409, 429, 5xx and 529, and on overload errors inside a stream. A provider's `retry-after` delay takes precedence. A stream is retried only while nothing has been received from it; a failure after that is left to the task-level checkpoint. A response that sends no data for `limits.request_timeout` is abandoned and retried. When retries run out, the run checkpoints and exits with `run "sdd resume <feature>"`.
-- **Token budget:** when `limits.token_budget` is set, no request is sent once the run has used that many tokens (input, cache writes, cache reads and output).
-- **Ctrl+C / SIGTERM:** the run context is cancelled, the current task is marked `interrupted`, state is saved and the process exits cleanly.
+- **The agent session ends** (closed, crashed, out of context): nothing is lost. Artifacts are on disk, state and journal are current, and finished tasks are committed. In a new session, `/sdd-implement` (or `task_next`) returns the task that was in progress.
+- **Verification fails:** the output goes back to the agent. A group that still fails after `limits.max_fix_attempts` is marked `failed` and waits for the user.
+- **A verification command hangs:** it is killed after `limits.command_timeout` and counts as a failure.
+- **Ctrl+C / SIGTERM on an `sdd` command:** the command's context is cancelled, any running verification is stopped, state is saved and the command exits cleanly.
 - **Crash or power loss:** the next command sees an interrupted action in the journal and a lock whose process is gone, and offers `sdd resume`.
 
 ### `sdd resume <feature>`
@@ -83,11 +82,8 @@ Recovery rests on three principles:
    - If it is missing, recreate it from branch `sdd/<feature>`.
    - If `HEAD` differs from the checkpoint SHA, rebuild group and task state from the `SDD-*` trailers in the branch history.
 5. **Handle leftover changes** from the interrupted task:
-   - `--discard` (default): reset to the last checkpoint and restart the task from scratch.
-   - `--keep`: keep the changes and hand the current diff to the agent as context.
-6. **Continue from the recorded phase.**
-   - Phase 1: reload the session history and the draft.
-   - Phase 2: regenerate the plan. This is safe because the plan is only written after it passes validation.
-   - Phase 3: continue with the first task that is not done.
+   - `--keep` (default): keep the changes; `task_next` hands the current diff to the agent with the task.
+   - `--discard`: reset the worktree to the last checkpoint and restart the task from scratch.
+6. **Report the next step.** Phases 1 and 2 need no repair (the artifacts are on disk); in Phase 3 the next `task_next` continues with the first task that is not done.
 
 `sdd status <feature>` shows the current state, any interrupted action, the lock holder and the exact next command to run.

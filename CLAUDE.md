@@ -3,7 +3,7 @@
 Context for Claude Code sessions on this repository, on any machine.
 
 ## Project
-`sdd` is a single-binary Go CLI for Spec-Driven Development that works with any LLM API. Start with these docs:
+`sdd` is a single-binary Go CLI for Spec-Driven Development that runs alongside the coding agent the user already has (Claude Code first). It never calls an LLM: the agent reasons, `sdd` owns artifacts, gates, verification, commits and the audit trail. Start with these docs:
 - `docs/BRIEF.md`: goals, constraints and architecture
 - `docs/WORKFLOW.md`: the four gated phases (specify → plan → implement → validate), the state machine and the commands
 - `docs/SPEC_GUIDELINES.md`: spec guardrails, ID conventions (`FR`/`NFR`/`AC`/`ADR`/`G`/`T`) and the plan format
@@ -13,19 +13,20 @@ Context for Claude Code sessions on this repository, on any machine.
 ## Current status
 - **M0 (scaffold): done.** `sdd init` and `sdd version`.
 - **M1 (specs, plans and state): done.** `sdd status`, `sdd spec new [--technical]/lint/approve`, `sdd plan new/approve`, `sdd sync check` (spec↔spec, spec↔plan, approvals) and `sdd trace <ID>|--matrix`. Specs and plans are written by hand for now; the phase is derived from artifacts and approvals (`workflow.Effective`) up to `plan-approved`.
-- **M2 (Claude provider): done.** `internal/provider/anthropic` over `net/http`: every request is streamed (SSE) and `Complete` collects it; tool use; thinking blocks; refusals and server-side fallbacks; neutral decorators for retries (`provider.WithRetry`), usage and token budget (`provider.WithMeter`) and redacted transcripts (`transcript.Recording`), assembled by `provider/registry`. Contract tests use SSE fixtures; `make live-test` runs a paid smoke test.
-- **Next: M3.** `sdd spec chat` loop with lint feedback, saved sessions, resumable chat.
+- **M2 (Claude provider): parked.** Built and tested (`internal/provider/...`, `internal/transcript`) for an agent loop inside `sdd`, then set aside when `sdd` moved to running inside the user's agent. Kept for a possible future API mode; nothing imports it from the CLI.
+- **Next: M3.** `sdd mcp` (MCP server), `sdd guide`, `sdd init --agent claude` (`.mcp.json`, `/sdd-*` commands, permission rules) and `--agent generic` (`AGENTS.md`); Phase 1 drafted with the agent in Claude Code. Brownfield adoption is M7.
 
 Update this section whenever a milestone is completed.
 
 ## Decisions (do not revisit without asking)
-- The framework is agnostic across **cloud LLM APIs only** (Claude first, then Gemini and OpenAI) behind the neutral `internal/provider.Provider` interface. No delegation to external agent CLIs and no local models.
-- Provider adapters use plain `net/http`, not vendor SDKs.
-- MCP goes through the official Go SDK (`github.com/modelcontextprotocol/go-sdk`), arriving in M5.
+- **`sdd` never calls an LLM.** The reasoning comes from the host coding agent (Claude Code first; Codex CLI, Gemini CLI and `AGENTS.md` readers in M8), under the user's subscription. `sdd` is deterministic: everything a gate depends on (lint, coverage, staleness, build and test results, trailers) is checked by `sdd`, never left to the agent.
+- The agent reaches `sdd` through `sdd mcp` (stdio MCP server, official Go SDK `github.com/modelcontextprotocol/go-sdk`) or the CLI. Both are thin layers over the same use cases (`internal/feature` and successors). Per-agent knowledge lives only in the files `sdd init --agent` installs.
+- Approvals and group review decisions are human-only: never MCP tools, and the installed permission rules deny the agent those commands.
+- The own agent loop ("API mode") is deferred. `internal/provider`, `provider/anthropic`, `provider/registry` and `internal/transcript` stay in the tree, unused; do not extend or delete them without asking. If API mode is revived, its decisions apply: plain `net/http` adapters, no local models.
 - The binary is installed once; each project is set up with `sdd init`. Specs, the plan, state and the journal are committed inside that project.
-- The orchestrator depends only on interfaces (`provider`, `tools`, `workspace`).
-- Keep dependencies minimal: stdlib plus `gopkg.in/yaml.v3` so far.
-- Anthropic requests use API version `2026-10-21` (no `temperature`/`top_p`/`top_k`), adaptive thinking with explicit `effort`, automatic prompt caching and, on supported models, server-side refusal `fallbacks`. Conversations are append-only: assistant blocks keep their wire form in `ContentBlock.Raw` and are replayed byte for byte (thinking blocks are rejected if edited).
+- `sdd init` never modifies an existing file (not even `.gitignore`: ephemeral paths go in `.sdd/.gitignore`). It creates what is missing and prints snippets for the rest. Existing projects are adopted as baseline specs without touching their code.
+- Keep dependencies minimal: stdlib plus `gopkg.in/yaml.v3`, and the official MCP Go SDK from M3.
+- (API mode, parked) Anthropic requests use API version `2026-10-21` (no `temperature`/`top_p`/`top_k`), adaptive thinking with explicit `effort`, automatic prompt caching and, on supported models, server-side refusal `fallbacks`. Conversations are append-only: assistant blocks keep their wire form in `ContentBlock.Raw` and are replayed byte for byte.
 
 ## Conventions
 - All docs, templates, code comments and CLI messages are in **English**. The user converses in **Spanish**.
@@ -56,6 +57,5 @@ make install # go install with version ldflags
 - `internal/trace`: ID index over specs and plan, tree rendering and matrix
 - `internal/feature`: use cases on one feature (load, lint, sync, create from template, approve, next action); the CLI and later the orchestrator call it
 - `internal/sddtest`: a valid fixture feature shared by tests
-- `internal/provider`: neutral types, `APIError`, `WithRetry`, `WithMeter`; `provider/anthropic`: the adapter; `provider/registry`: builds the configured provider with its decorators
-- `internal/transcript`: redacted JSONL transcripts and the `Recording` decorator
-- `internal/tools`, `internal/workspace`, `internal/orchestrator`: interfaces and stubs
+- `internal/workspace`: worktree and commit interfaces (implemented in M5)
+- Parked for API mode (unused): `internal/provider` (+ `anthropic`, `registry`), `internal/transcript`, `internal/tools`, `internal/orchestrator`
