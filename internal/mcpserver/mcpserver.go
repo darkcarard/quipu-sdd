@@ -49,7 +49,7 @@ func New(a *app.App) *mcp.Server {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "guide",
 		Description: "Get the instructions, format rules and template for drafting an artifact. " +
-			"Topics: workflow (how to work with sdd), functional, technical. Pass a feature to include its current status. Call it before drafting.",
+			"Topics: workflow (how to work with sdd), functional, technical, plan. Pass a feature to include its current status (and, for plan, the checklist of IDs to cover). Call it before drafting.",
 		Annotations: readOnly,
 	}, func(ctx context.Context, req *mcp.CallToolRequest, in guideArgs) (*mcp.CallToolResult, any, error) {
 		return text(a.Guide(in.Topic, in.Feature))
@@ -121,7 +121,7 @@ type requiredFeatureArg struct {
 }
 
 type guideArgs struct {
-	Topic   string `json:"topic" jsonschema:"workflow, functional or technical"`
+	Topic   string `json:"topic" jsonschema:"workflow, functional, technical or plan"`
 	Feature string `json:"feature,omitempty" jsonschema:"a feature whose current status to include"`
 }
 

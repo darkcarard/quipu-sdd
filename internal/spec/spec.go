@@ -166,8 +166,10 @@ type Technical struct {
 	// Traceability maps FR/NFR IDs to components.
 	Traceability []Mapping `yaml:"-"`
 	// TestStrategy maps AC IDs to test levels (unit, integration, e2e).
-	TestStrategy []Mapping    `yaml:"-"`
-	Decisions    []Decision   `yaml:"-"`
+	TestStrategy []Mapping  `yaml:"-"`
+	Decisions    []Decision `yaml:"-"`
+	// Architecture is the text of the Architecture section, where the layers are named.
+	Architecture string       `yaml:"-"`
 	Defined      []Definition `yaml:"-"`
 
 	lines []markdown.Line

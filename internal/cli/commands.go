@@ -48,7 +48,7 @@ func (a *App) runGuide(_ context.Context, args []string) error {
 		return err
 	}
 	if len(pos) != 1 {
-		return a.usageErr("sdd guide <workflow|functional|technical> [--feature <feature>]")
+		return a.usageErr("sdd guide <workflow|functional|technical|plan> [--feature <feature>]")
 	}
 	if pos[0] == "workflow" && *feat == "" { // needs no project
 		fmt.Fprint(a.Stdout, app.WorkflowGuide())

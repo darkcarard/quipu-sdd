@@ -11,7 +11,7 @@ You work in four gated phases:
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M3 done.** Specs are drafted with Claude Code through the `sdd` MCP server and the `/sdd-spec` and `/sdd-tech` commands, and linted, approved, synced and traced by `sdd`. Planning with the agent arrives in M4, implementation in M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M4 done.** Specs and the plan are drafted with Claude Code through the `sdd` MCP server and the `/sdd-spec`, `/sdd-tech` and `/sdd-plan` commands, and linted, approved, synced and traced by `sdd`. Implementation with the agent arrives in M5. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -35,6 +35,7 @@ sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and the Claude Code setup
 /sdd-spec "User signup with email"     # the agent interviews you and drafts the functional spec
 ! sdd spec approve user-signup --functional   # you approve (agents cannot)
 /sdd-tech user-signup                  # the agent drafts the technical spec
+/sdd-plan user-signup                  # then the plan (approve each one as above)
 ```
 
 `sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths:

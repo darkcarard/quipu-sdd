@@ -11,6 +11,7 @@ const (
 	secTraceability = "Requirement Traceability"
 	secTesting      = "Testing Strategy"
 	secDecisions    = "Decisions"
+	secArchitecture = "Architecture"
 )
 
 // ParseTechnical parses technical.md. The returned spec is never nil.
@@ -40,6 +41,12 @@ func ParseTechnical(content []byte) (*Technical, diag.List) {
 			})
 		case sameTitle(s.Title, secDecisions):
 			t.parseDecisions(s, &ds)
+		case sameTitle(s.Title, secArchitecture):
+			var lines []string
+			for _, l := range s.Body {
+				lines = append(lines, l.Text)
+			}
+			t.Architecture = strings.TrimSpace(strings.Join(lines, "\n"))
 		}
 	}
 	t.refs = findRefs(doc.Lines)

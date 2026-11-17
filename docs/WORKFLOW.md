@@ -55,7 +55,7 @@ Re-running `sdd init --agent claude` after upgrading `sdd` adds the commands of 
 | Tool | Purpose | CLI equivalent |
 |---|---|---|
 | `status` | Phase, artifact statuses and the next action | `sdd status` |
-| `guide` | Instructions, format rules and template for `workflow`, `functional`, `technical` (`plan` in M4, `implement` in M5), plus the status of a given feature | `sdd guide <topic> [--feature <feature>]` |
+| `guide` | Instructions, format rules and template for `workflow`, `functional`, `technical` and `plan` (`implement` in M5), plus the status of a given feature and, for `plan`, its coverage checklist | `sdd guide <topic> [--feature <feature>]` |
 | `spec_new` | Create a feature and its functional spec, or its technical spec | `sdd spec new` |
 | `plan_new` | Create `plan.md` from the template, with the source hashes stamped | `sdd plan new` |
 | `lint` | Lint the feature's artifacts (plan validation included) | `sdd spec lint` |
@@ -129,7 +129,7 @@ Ordering is strict: functional first, then technical. The technical spec must ma
 | `sdd plan new <feature>` | user or agent | Create `plan.md` from the template, with the source hashes stamped |
 | `sdd plan approve <feature>` | **user** | Freeze the plan (validation and coverage must pass) |
 
-The agent calls `guide plan` (format, rules, the limits from `sdd.yaml` and both approved specs), creates the plan with `plan_new`, writes it, and calls `lint` until validation and coverage pass. Then it asks the user to review and approve.
+The agent calls `guide` with topic `plan` and the feature. Besides the format and rules, it returns a **coverage checklist** built by `sdd` from the approved specs: every active FR and AC with its text and the components or test level the technical spec assigned to it, the NFRs, the file limit from `sdd.yaml`, the Architecture section (whose layers the groups must follow) and the language. The agent proposes the groups to the user, creates the plan with `plan_new`, writes it, and calls `lint` until validation, coverage and the layer check pass. Then it asks the user to review and approve.
 
 Plan rules:
 - **Groups (`G#`)** are ordered by layer, for example `domain → persistence → service → interface → integration`. Each group must be implementable and testable once the groups before it are done. Dependencies (`depends_on`) may only point to earlier groups.
@@ -142,6 +142,7 @@ Validation (deterministic):
 - Every requirement and criterion is covered.
 - Every referenced ID exists in the specs.
 - Tasks stay within the size limits.
+- Every group's layer is named in the technical spec's Architecture section (a warning otherwise).
 
 ## Phase 3: Implement (agent implements, `sdd` verifies, user reviews each group)
 

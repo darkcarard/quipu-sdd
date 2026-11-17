@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/templates"
 )
 
@@ -16,10 +17,10 @@ import (
 var guides embed.FS
 
 // GuideTopics are the topics `sdd guide` serves.
-var GuideTopics = []string{"workflow", "functional", "technical"}
+var GuideTopics = []string{"workflow", "functional", "technical", "plan"}
 
 // upcoming are guide topics that arrive with a later milestone.
-var upcoming = map[string]string{"plan": "M4", "implement": "M5"}
+var upcoming = map[string]string{"implement": "M5"}
 
 // WorkflowGuide is the overview of how an agent works with sdd.
 func WorkflowGuide() string {
@@ -33,7 +34,7 @@ func (a *App) Guide(topic, arg string) (string, error) {
 	switch topic {
 	case "workflow":
 		return WorkflowGuide(), nil
-	case "functional", "technical":
+	case "functional", "technical", "plan":
 	default:
 		if m, ok := upcoming[topic]; ok {
 			return "", fmt.Errorf("the %s guide is not available yet (planned for %s, see docs/ROADMAP.md)", topic, m)
@@ -71,8 +72,88 @@ func (a *App) Guide(topic, arg string) (string, error) {
 			sb.WriteString(line + "\n")
 		}
 		fmt.Fprintf(&sb, "- Next: %s\n", d.Next)
+		if topic == "plan" {
+			checklist, err := a.coverageChecklist(d.Name)
+			if err != nil {
+				return "", err
+			}
+			sb.WriteString(checklist)
+		}
 	}
 	return sb.String(), nil
+}
+
+// coverageChecklist lists what the plan must cover, with what the technical
+// spec assigned to each ID, and the limits that apply.
+func (a *App) coverageChecklist(name string) (string, error) {
+	f, err := feature.Load(a.Layout, a.Config, name)
+	if err != nil {
+		return "", err
+	}
+	var sb strings.Builder
+	sb.WriteString("\n## Coverage checklist\n\n")
+	if f.Functional == nil {
+		sb.WriteString("functional.md does not exist yet.\n")
+		return sb.String(), nil
+	}
+	tech := func(id string, levels bool) string {
+		if f.Technical == nil {
+			return ""
+		}
+		xs := f.Technical.Components(id)
+		label := "components"
+		if levels {
+			xs, label = f.Technical.TestLevels(id), "test level"
+		}
+		if len(xs) == 0 {
+			return ""
+		}
+		return fmt.Sprintf(" — %s: %s", label, strings.Join(xs, ", "))
+	}
+	sb.WriteString("Every FR and AC below must be covered by at least one task:\n\n")
+	for _, r := range f.Functional.Requirements {
+		if r.Retired {
+			continue
+		}
+		fmt.Fprintf(&sb, "- **%s** %s%s\n", r.ID, r.Title, tech(r.ID, false))
+		for _, c := range r.Criteria {
+			if !c.Retired {
+				fmt.Fprintf(&sb, "  - **%s** %s%s\n", c.ID, c.Text, tech(c.ID, true))
+			}
+		}
+	}
+	var nfrs []string
+	for _, r := range f.Functional.NFRs {
+		if !r.Retired {
+			text := r.Text
+			if text == "" {
+				text = r.Title
+			}
+			nfrs = append(nfrs, fmt.Sprintf("- **%s** %s%s", r.ID, text, tech(r.ID, false)))
+		}
+	}
+	if len(nfrs) > 0 {
+		sb.WriteString("\nNon-functional requirements (cover them where a task addresses them):\n\n" + strings.Join(nfrs, "\n") + "\n")
+	}
+	sb.WriteString("\nLimits and context:\n\n")
+	fmt.Fprintf(&sb, "- At most %d files per task (`limits.max_files_per_task`).\n", a.Config.Limits.MaxFilesPerTask)
+	if f.Technical != nil {
+		if arch := strings.TrimSpace(f.Technical.Architecture); arch != "" {
+			fmt.Fprintf(&sb, "- Architecture (name the layers from here):\n\n%s\n\n", indent(arch, "  > "))
+		}
+		if f.Technical.Language != "" {
+			fmt.Fprintf(&sb, "- Language: %s (profile `.sdd/profiles/%s.md`).\n", f.Technical.Language, f.Technical.Language)
+		}
+	}
+	return sb.String(), nil
+}
+
+func indent(s, prefix string) string {
+	lines := strings.Split(s, "\n")
+	for i, l := range lines {
+		lines[i] = prefix + l
+	}
+	return strings.Join(lines, "\n")
 }
 
 // template returns the project's copy of a template, or the built-in one.

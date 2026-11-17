@@ -9,7 +9,7 @@ If your agent supports MCP, register the `sdd` server: it runs over stdio with t
 | Purpose | Command |
 |---|---|
 | Phase and next step | `sdd status [<feature>]` |
-| Drafting instructions and template | `sdd guide functional\|technical [--feature <feature>]` |
+| Drafting instructions and template | `sdd guide functional\|technical\|plan [--feature <feature>]` |
 | Create a feature / its technical spec | `sdd spec new "<feature or description>"` / `sdd spec new <feature> --technical` |
 | Create the plan | `sdd plan new <feature>` |
 | Lint | `sdd spec lint [<feature>]` |

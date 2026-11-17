@@ -109,3 +109,17 @@ func TestNoGroups(t *testing.T) {
 		t.Fatalf("a plan without groups must fail, got:\n%v", ds)
 	}
 }
+
+func TestCheckLayers(t *testing.T) {
+	p, _ := Parse([]byte(sddtest.Plan))
+	if ds := CheckLayers(p, "domain → service → integration"); len(ds) != 0 {
+		t.Errorf("all layers named: %v", ds)
+	}
+	ds := CheckLayers(p, "Domain and Service layers")
+	if len(ds) != 1 || ds[0].Severity != diag.Warning || !strings.Contains(ds[0].Message, `G3 uses layer "integration"`) {
+		t.Errorf("diags = %v", ds)
+	}
+	if ds := CheckLayers(p, ""); ds != nil {
+		t.Errorf("no Architecture text means no check: %v", ds)
+	}
+}

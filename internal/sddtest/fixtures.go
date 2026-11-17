@@ -88,7 +88,7 @@ A signup service behind an HTTP handler.
 
 ## Architecture
 
-domain → persistence → service → interface
+domain → persistence → service → interface → integration
 
 ## Components
 

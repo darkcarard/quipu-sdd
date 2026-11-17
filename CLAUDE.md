@@ -15,7 +15,8 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M1 (specs, plans and state): done.** `sdd status`, `sdd spec new [--technical]/lint/approve`, `sdd plan new/approve`, `sdd sync check` (spec↔spec, spec↔plan, approvals) and `sdd trace <ID>|--matrix`. Specs and plans are written by hand for now; the phase is derived from artifacts and approvals (`workflow.Effective`) up to `plan-approved`.
 - **M2 (Claude provider): parked.** Built and tested (`internal/provider/...`, `internal/transcript`) for an agent loop inside `sdd`, then set aside when `sdd` moved to running inside the user's agent. Kept for a possible future API mode; nothing imports it from the CLI.
 - **M3 (agent integration + Specify): done.** `sdd mcp` (stdio, official Go SDK) with `status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check`, `trace`; `sdd guide`; `sdd init --agent claude|generic` and `--check` (never modifies existing files; ephemeral paths in `.sdd/.gitignore`); Claude Code skills `/sdd-spec`, `/sdd-tech`; agents journaled as `agent:<client>` and unable to approve (`feature.ErrHumanOnly`); commands find the project root from any subdirectory.
-- **Next: M4.** Plan with the agent: `guide plan`, `/sdd-plan`, plan drafting and validation through MCP. Brownfield adoption is M7.
+- **M4 (Plan): done.** `guide plan` with a coverage checklist built from the approved specs (IDs with their components/test levels, file limit, Architecture, language), `/sdd-plan` skill, plan layer check against the technical Architecture (`plan.CheckLayers`, warning). Next-step texts point to the agent commands and say approvals are the user's.
+- **Next: M5.** Implement: worktrees, `sdd implement`, `task_next`/`task_done`/`group_verify` (MCP + CLI), verification, WIP checkpoints squashed into group commits with trailers, `review`/`approve`/`revise`/`resume`/`clean`, `/sdd-implement`. Brownfield adoption is M7.
 
 Update this section whenever a milestone is completed.
 

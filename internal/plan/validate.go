@@ -183,3 +183,23 @@ func groupIndex(p *Plan, id string) int {
 	}
 	return -1
 }
+
+// CheckLayers warns about group layers that the technical spec's Architecture
+// section does not name, so the plan follows the agreed layering.
+func CheckLayers(p *Plan, architecture string) diag.List {
+	var ds diag.List
+	if strings.TrimSpace(architecture) == "" {
+		return nil
+	}
+	arch := strings.ToLower(architecture)
+	warned := map[string]bool{}
+	for _, g := range p.Groups {
+		layer := strings.ToLower(strings.TrimSpace(g.Layer))
+		if layer == "" || warned[layer] || strings.Contains(arch, layer) {
+			continue
+		}
+		warned[layer] = true
+		ds.Warnf(g.fields["layer"], "%s uses layer %q, which the technical spec's Architecture section does not name", g.ID, g.Layer)
+	}
+	return ds
+}

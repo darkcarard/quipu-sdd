@@ -1,7 +1,7 @@
 // Package feature implements the use cases on one feature: loading its
 // artifacts and state, linting, sync checks, creating artifacts from templates
 // and approving them. The CLI is a thin layer over this package, and the
-// orchestrator (M3+) reuses it after every agent turn.
+// MCP server reaches it through internal/app.
 package feature
 
 import (
@@ -168,6 +168,9 @@ func (f *Feature) Lint(a workflow.Artifact) diag.List {
 		if f.Functional != nil {
 			more = append(more, plan.CheckCoverage(f.Plan, f.Functional)...)
 		}
+		if f.Technical != nil {
+			more = append(more, plan.CheckLayers(f.Plan, f.Technical.Architecture)...)
+		}
 	}
 	return append(ds, more.InFile(file.Rel)...)
 }
@@ -281,24 +284,24 @@ func (f *Feature) Next() string {
 	edit := func(a workflow.Artifact) string {
 		switch f.Statuses[a] {
 		case workflow.StatusStale:
-			return fmt.Sprintf("reconcile specs/%s/%s with %s, then run `%s`", n, FileName(a), f.changedSources(a), ApproveCommand(n, a))
+			return fmt.Sprintf("reconcile specs/%s/%s with %s, then the user re-approves it with `%s`", n, FileName(a), f.changedSources(a), ApproveCommand(n, a))
 		case workflow.StatusModified:
-			return fmt.Sprintf("review your edits to specs/%s/%s, then run `%s`", n, FileName(a), ApproveCommand(n, a))
+			return fmt.Sprintf("review the edits to specs/%s/%s, then the user re-approves it with `%s`", n, FileName(a), ApproveCommand(n, a))
 		}
-		return fmt.Sprintf("edit specs/%s/%s until `sdd spec lint %s` passes, then run `%s`", n, FileName(a), n, ApproveCommand(n, a))
+		return fmt.Sprintf("edit specs/%s/%s until `sdd spec lint %s` passes, then the user approves it with `%s`", n, FileName(a), n, ApproveCommand(n, a))
 	}
 	switch f.Phase {
 	case workflow.FunctionalDrafting:
 		if !f.Files[workflow.Functional].Exists {
-			return "sdd spec new " + n
+			return fmt.Sprintf("draft the functional spec with your agent (`/sdd-spec %s` in Claude Code) or create it with `sdd spec new %s`", n, n)
 		}
 		return edit(workflow.Functional)
 	case workflow.FunctionalApproved:
-		return fmt.Sprintf("sdd spec new %s --technical (agent drafting with `sdd spec chat` arrives in M3)", n)
+		return fmt.Sprintf("draft the technical spec with your agent (`/sdd-tech %s` in Claude Code) or create it with `sdd spec new %s --technical`", n, n)
 	case workflow.TechnicalDrafting:
 		return edit(workflow.Technical)
 	case workflow.TechnicalApproved:
-		return fmt.Sprintf("sdd plan new %s and write the plan (agent generation with `sdd plan` arrives in M4)", n)
+		return fmt.Sprintf("draft the plan with your agent (`/sdd-plan %s` in Claude Code) or create it with `sdd plan new %s`", n, n)
 	case workflow.PlanDrafting:
 		return edit(workflow.Plan)
 	case workflow.PlanApproved, workflow.Implementing:

@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,9 +13,12 @@ import (
 
 	"github.com/darkcarard/sdd-framework/internal/app"
 	"github.com/darkcarard/sdd-framework/internal/config"
+	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/journal"
 	"github.com/darkcarard/sdd-framework/internal/sddtest"
 	"github.com/darkcarard/sdd-framework/internal/state"
+	"github.com/darkcarard/sdd-framework/internal/templates"
+	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
 // connect starts the server for a fresh project and returns a client session
@@ -27,6 +31,9 @@ func connect(t *testing.T) (*mcp.ClientSession, *app.App) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(l.ConfigFile(), []byte(config.DefaultYAML()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := templates.Install(l.TemplatesDir(), l.ProfilesDir(), false); err != nil {
 		t.Fatal(err)
 	}
 	a, err := app.Open(dir)
@@ -143,6 +150,77 @@ func TestDraftingThroughMCP(t *testing.T) {
 	}
 }
 
+// TestPlanningThroughMCP drafts a plan the way an agent does, after the user
+// approved both specs.
+func TestPlanningThroughMCP(t *testing.T) {
+	cs, a := connect(t)
+	ctx := context.Background()
+	human := a.Who
+	a.Who = func(context.Context) (feature.Identity, error) {
+		return feature.Identity{Name: "Ada", Email: "ada@example.com"}, nil
+	}
+	defer func() { a.Who = human }()
+
+	if _, isErr := call(t, cs, "spec_new", map[string]any{"text": "user-signup"}); isErr {
+		t.Fatal("spec_new failed")
+	}
+	dir := a.Layout.SpecDir("user-signup")
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("functional.md", sddtest.Functional)
+	if _, err := a.Approve(ctx, "user-signup", workflow.Functional); err != nil {
+		t.Fatal(err)
+	}
+	if out, isErr := call(t, cs, "plan_new", map[string]any{"feature": "user-signup"}); !isErr || !strings.Contains(out, "technical.md does not exist yet") {
+		t.Errorf("plan before the technical spec: %v %s", isErr, out)
+	}
+	call(t, cs, "spec_new", map[string]any{"text": "user-signup", "technical": true})
+	write("technical.md", sddtest.Technical)
+	if _, err := a.Approve(ctx, "user-signup", workflow.Technical); err != nil {
+		t.Fatal(err)
+	}
+
+	out, isErr := call(t, cs, "guide", map[string]any{"topic": "plan", "feature": "user-signup"})
+	for _, want := range []string{
+		"# Drafting the plan", "## Coverage checklist",
+		"- **FR-001** Sign up with email — components: SignupService, HTTP handler",
+		"  - **AC-002** Given an email that is already registered", "test level: unit, integration",
+		"- **NFR-001** Signup responds in p95 < 300 ms. — components: HTTP handler",
+		"At most 5 files per task", "> domain → persistence → service → interface → integration", "Language: go",
+	} {
+		if isErr || !strings.Contains(out, want) {
+			t.Errorf("plan guide missing %q", want)
+		}
+	}
+
+	out, isErr = call(t, cs, "plan_new", map[string]any{"feature": "user-signup"})
+	if isErr || !strings.Contains(out, "created  specs/user-signup/plan.md") {
+		t.Fatalf("plan_new: %v %s", isErr, out)
+	}
+	write("plan.md", strings.Replace(sddtest.Plan, "- layer: integration", "- layer: transport", 1))
+	out, _ = call(t, cs, "lint", map[string]any{"feature": "user-signup"})
+	if !strings.Contains(out, `G3 uses layer "transport", which the technical spec's Architecture section does not name`) {
+		t.Errorf("layer check: %s", out)
+	}
+	write("plan.md", sddtest.Plan)
+	out, _ = call(t, cs, "lint", map[string]any{"feature": "user-signup"})
+	if !strings.Contains(out, "0 errors, 0 warnings") {
+		t.Errorf("lint: %s", out)
+	}
+	out, _ = call(t, cs, "status", map[string]any{"feature": "user-signup"})
+	if !strings.Contains(out, "Phase:   plan-drafting") || !strings.Contains(out, "the user approves it with `sdd plan approve user-signup`") {
+		t.Errorf("status: %s", out)
+	}
+	// The agent cannot approve, even by calling the use case with its identity.
+	if _, err := as(a, nil).Approve(ctx, "user-signup", workflow.Plan); !errors.Is(err, feature.ErrHumanOnly) {
+		t.Errorf("agent approval: %v", err)
+	}
+}
+
 func TestToolErrorsReachTheAgent(t *testing.T) {
 	cs, _ := connect(t)
 	tests := []struct {
@@ -153,7 +231,7 @@ func TestToolErrorsReachTheAgent(t *testing.T) {
 		{"spec_new", map[string]any{}, "pass text"},
 		{"spec_new", map[string]any{"text": "x", "technical": true}, "feature not found"},
 		{"plan_new", map[string]any{"feature": "nope"}, "feature not found"},
-		{"guide", map[string]any{"topic": "plan"}, "M4"},
+		{"guide", map[string]any{"topic": "implement"}, "M5"},
 		{"guide", map[string]any{"topic": "poetry"}, "unknown guide topic"},
 		{"trace", map[string]any{"id": "bogus"}, "not a traceable ID"},
 	}

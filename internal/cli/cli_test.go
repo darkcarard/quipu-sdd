@@ -113,7 +113,7 @@ func TestInitAgentClaude(t *testing.T) {
 	if code != ExitOK {
 		t.Fatal(e)
 	}
-	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md"} {
+	for _, f := range []string{".mcp.json", ".claude/settings.json", ".claude/skills/sdd-spec/SKILL.md", ".claude/skills/sdd-tech/SKILL.md", ".claude/skills/sdd-plan/SKILL.md"} {
 		if !strings.Contains(out, "created  "+f) {
 			t.Errorf("%s not created:\n%s", f, out)
 		}
