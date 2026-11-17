@@ -374,11 +374,9 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
       <div class="card">
         <span class="stepno">A · por máquina</span>
         <h3>Instala sdd</h3>
-        <div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>git clone https://github.com/darkcarard/quipu-sdd
-<span class="p">$ </span>cd quipu-sdd
-<span class="p">$ </span>make install
+        <div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest
 <span class="p">$ </span>sdd version</pre></div>
-        <p>Se instala en <code>~/go/bin</code>. Asegúrate de que esa carpeta esté en tu <code>PATH</code>.</p>
+        <p>Se instala en <code>~/go/bin</code>. Asegúrate de que esa carpeta esté en tu <code>PATH</code>. También puedes clonar el repositorio y ejecutar <code>make install</code>.</p>
       </div>
       <div class="card">
         <span class="stepno">B · por proyecto</span>
@@ -609,7 +607,8 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
 
   <footer>
     <span>Quipu (<code>sdd</code>) · Spec-Driven Development para agentes de código</span>
-    <span>Más detalle (en inglés): <code>docs/WORKFLOW.md</code> · <code>docs/SPEC_GUIDELINES.md</code> · <code>docs/TRACEABILITY.md</code></span>
+    <span>Más detalle (en inglés): <a href="https://github.com/darkcarard/quipu-sdd/blob/main/docs/WORKFLOW.md"><code>docs/WORKFLOW.md</code></a> · <a href="https://github.com/darkcarard/quipu-sdd/blob/main/docs/SPEC_GUIDELINES.md"><code>docs/SPEC_GUIDELINES.md</code></a> · <a href="https://github.com/darkcarard/quipu-sdd/blob/main/docs/TRACEABILITY.md"><code>docs/TRACEABILITY.md</code></a></span>
+    <span>Código fuente: <a href="https://github.com/darkcarard/quipu-sdd">github.com/darkcarard/quipu-sdd</a> (la única fuente oficial) · Apache-2.0</span>
   </footer>
 </div>
 

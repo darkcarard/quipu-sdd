@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quipu User Manual</title>
+<link rel="icon" href="assets/quipu-mark.svg" type="image/svg+xml">
+<script>
+(function () {
+  var es = /^es\b/i.test((navigator.languages && navigator.languages[0]) || navigator.language || '');
+  location.replace((es ? 'MANUAL.es.html' : 'MANUAL.html') + location.hash);
+})();
+</script>
+<meta http-equiv="refresh" content="1; url=MANUAL.html">
+<style>body { font-family: system-ui, sans-serif; margin: 2rem; background: #f3f5f4; color: #15211f; }
+@media (prefers-color-scheme: dark) { body { background: #0f1615; color: #e6efec; } a { color: #4cc4b2; } }</style>
+</head>
+<body>
+<p><a href="MANUAL.html">Quipu User Manual</a> · <a href="MANUAL.es.html" hreflang="es">Manual en español</a></p>
+</body>
+</html>

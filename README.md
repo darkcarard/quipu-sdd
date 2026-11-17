@@ -27,6 +27,8 @@ go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest
 make install
 ```
 
+This repository is the only official source of Quipu (see [SECURITY.md](SECURITY.md)). It needs Go 1.25 and git.
+
 ## Use in a project
 
 ```sh
@@ -84,7 +86,7 @@ Editing an approved spec sends it back to drafting and marks every artifact deri
 
 ## Documentation
 
-- [docs/MANUAL.html](docs/MANUAL.html) ([español](docs/MANUAL.es.html)): illustrated user manual, the place to start (open it in a browser)
+- [User manual](https://darkcarard.github.io/quipu-sdd/) ([English](https://darkcarard.github.io/quipu-sdd/MANUAL.html), [español](https://darkcarard.github.io/quipu-sdd/MANUAL.es.html)): the illustrated manual, the place to start (sources in `docs/MANUAL*.html`)
 - [docs/BRIEF.md](docs/BRIEF.md): goals, constraints and architecture
 - [docs/WORKFLOW.md](docs/WORKFLOW.md): the four phases, state machine and commands
 - [docs/SPEC_GUIDELINES.md](docs/SPEC_GUIDELINES.md): spec guardrails and ID conventions
@@ -97,3 +99,9 @@ Editing an approved spec sends it back to drafting and marks every artifact deri
 make check   # gofmt check, go vet, go test -race
 make build   # bin/sdd
 ```
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+Quipu is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 darkcarard.

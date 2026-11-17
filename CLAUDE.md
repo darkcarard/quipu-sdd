@@ -45,6 +45,7 @@ Update this section whenever a milestone is completed.
 - Follow `internal/templates/profiles/go.md`: gofmt, table-driven tests, `t.TempDir()`, wrapped errors, `context.Context` first.
 - When a change affects behavior described in `docs/`, update the docs in the same commit.
 - Commit once per milestone (or per coherent step), then push to `origin` (github.com/darkcarard/quipu-sdd). The user works from several machines.
+- The repository is public (since 2026-11-17) under Apache-2.0 (`LICENSE`, `NOTICE`, copyright darkcarard), with `SECURITY.md` and `CONTRIBUTING.md`. `main` is protected: if a direct push is refused, push a branch and open a pull request with `gh pr create`. The manual is served by GitHub Pages from `docs/` (`docs/index.html` redirects by browser language; `docs/.nojekyll`).
 
 ## Commands
 ```sh
