@@ -1,9 +1,12 @@
 ---
+name: sdd-adopt
 description: Adopt an existing codebase into sdd (Spec-Driven Development) by documenting its current behavior and design as baseline specs, without changing the code. Use when the user wants to start using sdd on a project that already has code.
 argument-hint: [area or module to adopt]
 ---
 
-Adopt this existing project into sdd: $ARGUMENTS
+Adopt this existing project into sdd.
+
+Area to adopt (optional): {{args}}
 
 Use the `sdd` MCP tools (if they are not available, run `sdd adopt --context` and the other `sdd` commands in the shell).
 

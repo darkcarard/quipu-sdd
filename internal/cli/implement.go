@@ -8,6 +8,7 @@ import (
 
 	"github.com/darkcarard/quipu-sdd/internal/agents"
 	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
 )
 
 // oneFeature parses exactly one positional argument (the feature) and the flags defined on fs.
@@ -184,7 +185,7 @@ func (a *App) runRevise(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Stdout, "%s is back in progress with your feedback (revision %d).\n\nNext: type `/sdd-implement %s` in Claude Code; the agent gets the feedback from task_next.\n", g.ID, g.Revisions, g.Feature)
+	fmt.Fprintf(a.Stdout, "%s is back in progress with your feedback (revision %d).\n\nNext: %s; the agent gets the feedback from task_next.\n", g.ID, g.Revisions, feature.Skill("sdd-implement", g.Feature))
 	return nil
 }
 
@@ -266,7 +267,7 @@ func (a *App) runValidate(ctx context.Context, args []string) error {
 	return nil
 }
 
-// runHook answers a Claude Code PreToolUse hook: a Bash call that runs a
+// runHook answers a PreToolUse hook (Claude Code, Codex, Antigravity): a Bash call that runs a
 // human-only command, even inside a wrapper, is denied. It needs no project.
 func (a *App) runHook(_ context.Context, args []string) error {
 	if len(args) != 1 || args[0] != "pre-tool-use" {
@@ -279,8 +280,8 @@ func (a *App) runHook(_ context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	if reason := agents.Guard(in); reason != "" {
-		_, err = a.Stdout.Write(agents.HookResponse(reason))
+	if reply := agents.HookReply(in); reply != nil {
+		_, err = a.Stdout.Write(reply)
 	}
 	return err
 }

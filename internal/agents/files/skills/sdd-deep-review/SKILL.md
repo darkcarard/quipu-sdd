@@ -1,9 +1,12 @@
 ---
+name: sdd-deep-review
 description: Review whether an implemented feature really satisfies each acceptance criterion of its spec (sdd, Spec-Driven Development), and write a deep-review report. Use when the user asks for a semantic or deep review of a feature.
 argument-hint: <feature>
 ---
 
-Do a deep review of this feature: $ARGUMENTS
+Do a deep review of a feature.
+
+Feature: {{args}}
 
 Use the `sdd` MCP tools (if they are not available, run `sdd review <feature> --context` in the shell).
 

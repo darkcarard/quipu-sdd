@@ -1,9 +1,12 @@
 ---
+name: sdd-tech
 description: Draft or continue the technical spec of a feature with sdd (Spec-Driven Development), once its functional spec is approved. Use when the user wants to design how an approved feature will be built.
 argument-hint: <feature>
 ---
 
-Draft the technical spec of this feature with the user: $ARGUMENTS
+Draft the technical spec of a feature with the user.
+
+Feature: {{args}}
 
 Use the `sdd` MCP tools (if they are not available, run the equivalent `sdd` commands in the shell).
 

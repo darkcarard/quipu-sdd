@@ -79,7 +79,7 @@ func TestImplementWorkflowCLI(t *testing.T) {
 		"Group G1: Domain model  [awaiting-review]", "agent: User entity", "internal/signup/user.go", "test:       passed")
 	contains(t, mustRun(t, dir, ExitError, "approve", "G2"), "no feature being implemented has G2 as its current group")
 	contains(t, mustRun(t, dir, ExitError, "revise", "G1"), "feedback is required")
-	contains(t, mustRun(t, dir, ExitOK, "revise", "G1", "-m", "Add a doc comment"), "G1 is back in progress", "type `/sdd-implement user-signup` in Claude Code")
+	contains(t, mustRun(t, dir, ExitOK, "revise", "G1", "-m", "Add a doc comment"), "G1 is back in progress", "`/sdd-implement user-signup` in your agent (`$sdd-implement` in Codex)")
 	contains(t, mustRun(t, dir, ExitOK, "task", "next", sddtest.Feature), "The user asked for changes:", "Add a doc comment")
 	mustRun(t, dir, ExitOK, "group", "verify", sddtest.Feature)
 	contains(t, mustRun(t, dir, ExitOK, "approve"), "approved G1", "start G2")

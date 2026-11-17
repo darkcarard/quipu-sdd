@@ -305,6 +305,15 @@ func (f *Feature) RenderLog() error {
 	return state.WriteFileAtomic(f.Layout.LogFile(f.Name), []byte(journal.RenderLog(f.Name, events)), 0o644)
 }
 
+// Skill names an agent command: `/name args` in Claude Code and Antigravity,
+// `$name args` in Codex.
+func Skill(name, args string) string {
+	if args != "" {
+		args = " " + args
+	}
+	return fmt.Sprintf("`/%s%s` in your agent (`$%s` in Codex)", name, args, name)
+}
+
 // Next returns the next command (or action) for the feature, as shown by `sdd status`.
 func (f *Feature) Next() string {
 	n := f.Name
@@ -320,25 +329,25 @@ func (f *Feature) Next() string {
 	switch f.Phase {
 	case workflow.FunctionalDrafting:
 		if f.Baseline() && f.Files[workflow.Functional].Exists && f.Statuses[workflow.Functional] == workflow.StatusDraft {
-			return fmt.Sprintf("document the existing behavior in specs/%s/functional.md with your agent (`/sdd-adopt` in Claude Code), then the user approves it with `%s`", n, ApproveCommand(n, workflow.Functional))
+			return fmt.Sprintf("document the existing behavior in specs/%s/functional.md with your agent (%s), then the user approves it with `%s`", n, Skill("sdd-adopt", ""), ApproveCommand(n, workflow.Functional))
 		}
 		if !f.Files[workflow.Functional].Exists {
-			return fmt.Sprintf("draft the functional spec with your agent (`/sdd-spec %s` in Claude Code) or create it with `sdd spec new %s`", n, n)
+			return fmt.Sprintf("draft the functional spec with your agent (%s) or create it with `sdd spec new %s`", Skill("sdd-spec", n), n)
 		}
 		return edit(workflow.Functional)
 	case workflow.FunctionalApproved:
-		return fmt.Sprintf("draft the technical spec with your agent (`/sdd-tech %s` in Claude Code) or create it with `sdd spec new %s --technical`", n, n)
+		return fmt.Sprintf("draft the technical spec with your agent (%s) or create it with `sdd spec new %s --technical`", Skill("sdd-tech", n), n)
 	case workflow.TechnicalDrafting:
 		return edit(workflow.Technical)
 	case workflow.TechnicalApproved:
 		if f.Baseline() {
 			return fmt.Sprintf("re-approve the technical spec with `sdd spec approve %s --technical`", n)
 		}
-		return fmt.Sprintf("draft the plan with your agent (`/sdd-plan %s` in Claude Code) or create it with `sdd plan new %s`", n, n)
+		return fmt.Sprintf("draft the plan with your agent (%s) or create it with `sdd plan new %s`", Skill("sdd-plan", n), n)
 	case workflow.PlanDrafting:
 		return edit(workflow.Plan)
 	case workflow.PlanApproved:
-		return fmt.Sprintf("start implementing with `sdd implement %s` (creates the worktree and branch sdd/%s), then type `/sdd-implement %s` in Claude Code", n, n, n)
+		return fmt.Sprintf("start implementing with `sdd implement %s` (creates the worktree and branch sdd/%s), then %s", n, n, Skill("sdd-implement", n))
 	case workflow.Implementing:
 		for _, g := range f.State.Groups {
 			switch g.Status {
@@ -349,11 +358,11 @@ func (f *Feature) Next() string {
 			case workflow.GroupFailed:
 				return fmt.Sprintf("%s failed verification: inspect .sdd/worktrees/%s, then give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, n, g.ID)
 			case workflow.GroupInProgress:
-				return fmt.Sprintf("continue %s with your agent (type `/sdd-implement %s` in Claude Code)", g.ID, n)
+				return fmt.Sprintf("continue %s with your agent (%s)", g.ID, Skill("sdd-implement", n))
 			}
-			return fmt.Sprintf("start %s with your agent (type `/sdd-implement %s` in Claude Code)", g.ID, n)
+			return fmt.Sprintf("start %s with your agent (%s)", g.ID, Skill("sdd-implement", n))
 		}
-		return fmt.Sprintf("continue with your agent (type `/sdd-implement %s` in Claude Code)", n)
+		return fmt.Sprintf("continue with your agent (%s)", Skill("sdd-implement", n))
 	case workflow.Implemented:
 		return fmt.Sprintf("run `sdd validate %s` (integration tests and every consistency check; writes report.md)", n)
 	case workflow.Baselined:

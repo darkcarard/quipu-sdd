@@ -251,3 +251,57 @@ func TestHookBlocksHumanOnlyCommands(t *testing.T) {
 		t.Errorf("sdd status must pass: %d %q", code, out)
 	}
 }
+
+func TestInitAgentsCodexAndAntigravity(t *testing.T) {
+	dir := t.TempDir()
+	code, out, e := run(t, dir, "init", "--agent", "codex, antigravity")
+	if code != ExitOK {
+		t.Fatal(e)
+	}
+	for _, f := range []string{"AGENTS.md", ".agents/skills/sdd-spec/SKILL.md", ".agents/skills/sdd-implement/SKILL.md",
+		".codex/config.toml", ".codex/hooks.json", ".codex/rules/sdd.rules", ".agents/mcp_config.json", ".agents/hooks.json"} {
+		if strings.Count(out, "created  "+f+"\n") != 1 {
+			t.Errorf("%s must be created once:\n%s", f, out)
+		}
+	}
+	contains(t, out, "Codex is set up", "$sdd-spec", "Antigravity is set up")
+	read := func(p string) string {
+		b, err := os.ReadFile(filepath.Join(dir, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	skill := read(".agents/skills/sdd-implement/SKILL.md")
+	contains(t, skill, "name: sdd-implement", "as given in the user's request", "`$sdd-implement` in Codex")
+	if strings.Contains(skill, "{{") || strings.Contains(skill, "$ARGUMENTS") {
+		t.Errorf("skill placeholders left:\n%s", skill)
+	}
+	contains(t, read(".codex/config.toml"), "[mcp_servers.sdd]", `args = ["mcp"]`)
+	contains(t, read(".codex/hooks.json"), `"PreToolUse"`, `"matcher": "Bash"`, `"command": "sdd hook pre-tool-use"`)
+	contains(t, read(".codex/rules/sdd.rules"), `decision = "forbidden"`, `"merge"`)
+	contains(t, read(".agents/mcp_config.json"), `"sdd"`, `"mcp"`)
+	contains(t, read(".agents/hooks.json"), `"sdd-guard"`, `"matcher": "run_command"`, "sdd hook pre-tool-use")
+	contains(t, read("AGENTS.md"), "sdd merge")
+
+	if code, out, _ := run(t, dir, "init", "--agent", "codex,antigravity", "--check"); code != ExitOK || !strings.Contains(out, "Everything is in place") {
+		t.Errorf("check after init: %d\n%s", code, out)
+	}
+	// Claude Code keeps $ARGUMENTS in its own copy of the skills.
+	run(t, dir, "init", "--agent", "claude")
+	contains(t, read(".claude/skills/sdd-spec/SKILL.md"), "Feature (a name or a description): $ARGUMENTS")
+	if code, _, _ := run(t, dir, "init", "--agent", "cursor"); code != ExitUsage {
+		t.Errorf("unknown agent: exit %d", code)
+	}
+}
+
+func TestInitKeepsExistingCodexConfig(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".codex"), 0o755)
+	os.WriteFile(filepath.Join(dir, ".codex", "config.toml"), []byte("model = \"x\"\n"), 0o644)
+	_, out, _ := run(t, dir, "init", "--agent", "codex")
+	contains(t, out, "kept     .codex/config.toml", "[mcp_servers.sdd]")
+	if b, _ := os.ReadFile(filepath.Join(dir, ".codex", "config.toml")); string(b) != "model = \"x\"\n" {
+		t.Errorf("config.toml was modified: %s", b)
+	}
+}

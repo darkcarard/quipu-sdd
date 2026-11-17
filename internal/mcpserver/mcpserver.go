@@ -15,7 +15,7 @@ import (
 	"github.com/darkcarard/quipu-sdd/internal/version"
 )
 
-// Name is the server name agents see (tools appear as mcp__sdd__<tool> in Claude Code).
+// Name is the server name agents see (e.g. mcp__sdd__<tool> in Claude Code).
 const Name = "sdd"
 
 // Tools lists the tool names, in registration order.

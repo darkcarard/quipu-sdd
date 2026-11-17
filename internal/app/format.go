@@ -6,6 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/darkcarard/quipu-sdd/internal/feature"
 	"github.com/darkcarard/quipu-sdd/internal/implement"
 	"github.com/darkcarard/quipu-sdd/internal/trace"
 	"github.com/darkcarard/quipu-sdd/internal/validate"
@@ -192,7 +193,7 @@ func FormatGroups(groups []implement.GroupView) string {
 }
 
 // FormatStarted renders the result of `sdd implement`.
-func FormatStarted(s implement.Started, feature string) string {
+func FormatStarted(s implement.Started, name string) string {
 	var sb strings.Builder
 	if s.Worktree != "" {
 		verb := "using"
@@ -206,7 +207,7 @@ func FormatStarted(s implement.Started, feature string) string {
 		for _, t := range s.Group.Tasks {
 			sb.WriteString(taskLine(t) + "\n")
 		}
-		fmt.Fprintf(&sb, "\nNext: type `/sdd-implement %s` in Claude Code (or have your agent call task_next)\n", feature)
+		fmt.Fprintf(&sb, "\nNext: %s (or have your agent call task_next)\n", feature.Skill("sdd-implement", name))
 	}
 	if s.Message != "" {
 		fmt.Fprintf(&sb, "\n%s\n", s.Message)

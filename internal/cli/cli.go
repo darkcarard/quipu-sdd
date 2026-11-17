@@ -58,7 +58,7 @@ func (a *App) commands() []command {
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
 		{name: "guide", summary: "Print the drafting instructions and template for a topic", run: (*App).runGuide},
 		{name: "mcp", summary: "Serve sdd to a coding agent over MCP (stdio)", run: (*App).runMCP},
-		{name: "hook", summary: "Agent hook: block human-only commands (installed by sdd init --agent claude)", run: (*App).runHook},
+		{name: "hook", summary: "Agent hook: block human-only commands (installed by sdd init --agent)", run: (*App).runHook},
 		{name: "adopt", summary: "Inventory an existing project to document it as baseline specs", run: (*App).runAdopt},
 		{name: "feature", summary: "Show or change a feature's title and description", run: (*App).runFeature},
 		{name: "spec", summary: "Create, lint and approve specs", run: (*App).runSpec},
@@ -187,17 +187,24 @@ func (a *App) runVersion(_ context.Context, args []string) error {
 	return nil
 }
 
-const initUsage = "sdd init [--agent claude|generic] [--check] [--force]"
+const initUsage = "sdd init [--agent claude|codex|antigravity|generic[,…]] [--check] [--force]"
 
 func (a *App) runInit(_ context.Context, args []string) error {
 	fs := a.newFlagSet("init")
 	force := fs.Bool("force", false, "overwrite templates and profiles in .sdd/ with the built-in versions")
-	agent := fs.String("agent", "", "also set up a coding agent: "+strings.Join(agents.Names, ", "))
+	agent := fs.String("agent", "", "also set up coding agents, comma-separated: "+strings.Join(agents.Names, ", "))
 	check := fs.Bool("check", false, "report what is missing without writing anything")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() > 0 || (*agent != "" && !slices.Contains(agents.Names, *agent)) || (*check && *force) {
+	var chosen []string
+	for _, n := range strings.Split(*agent, ",") {
+		if n = strings.ToLower(strings.TrimSpace(n)); n != "" && !slices.Contains(chosen, n) {
+			chosen = append(chosen, n)
+		}
+	}
+	bad := slices.ContainsFunc(chosen, func(n string) bool { return !slices.Contains(agents.Names, n) })
+	if fs.NArg() > 0 || bad || (*check && *force) {
 		return a.usageErr(initUsage)
 	}
 	l := state.Layout{Root: a.Dir}
@@ -214,10 +221,17 @@ func (a *App) runInit(_ context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Agents can share files (AGENTS.md, .agents/skills): each is listed once.
 	var files []agents.File
-	if *agent != "" {
-		if files, err = agents.Files(*agent, app.WorkflowGuide()); err != nil {
+	for _, n := range chosen {
+		list, err := agents.Files(n, app.WorkflowGuide())
+		if err != nil {
 			return err
+		}
+		for _, f := range list {
+			if !slices.ContainsFunc(files, func(g agents.File) bool { return g.Path == f.Path }) {
+				files = append(files, f)
+			}
 		}
 	}
 
@@ -261,15 +275,24 @@ func (a *App) runInit(_ context.Context, args []string) error {
 		a.report(results)
 	}
 
-	switch *agent {
-	case "claude":
-		fmt.Fprintln(a.Stdout, "\nClaude Code is set up. Restart it in this project and approve the `sdd` MCP server when asked;\nthen start with /sdd-spec <feature or description>.")
-	case "generic":
-		fmt.Fprintln(a.Stdout, "\nAGENTS.md explains the workflow to your agent. Register `sdd mcp` (stdio) as an MCP server if your agent supports it.")
-	default:
-		fmt.Fprintln(a.Stdout, "\nSDD initialized. Next: sdd init --agent claude (or generic), or sdd spec new <feature>")
+	if len(chosen) == 0 {
+		fmt.Fprintln(a.Stdout, "\nSDD initialized. Next: sdd init --agent claude|codex|antigravity|generic, or sdd spec new <feature>")
+	}
+	for _, n := range chosen {
+		fmt.Fprintln(a.Stdout, "\n"+agentReady[n])
 	}
 	return nil
+}
+
+// agentReady is what to do once an agent's files are installed.
+var agentReady = map[string]string{
+	"claude": "Claude Code is set up. Restart it in this project and approve the `sdd` MCP server when asked;\n" +
+		"then start with /sdd-spec <feature or description>.",
+	"codex": "Codex is set up. Trust this project when Codex asks (it loads .codex/ only in trusted projects),\n" +
+		"review and trust the sdd hook with /hooks, then start with $sdd-spec <feature or description>.",
+	"antigravity": "Antigravity is set up. Trust this folder when agy asks and check the sdd server with /mcp;\n" +
+		"then start with /sdd-spec <feature or description>.",
+	"generic": "AGENTS.md explains the workflow to your agent. Register `sdd mcp` (stdio) as an MCP server if your agent supports it.",
 }
 
 // report prints install results and returns whether anything needs attention.

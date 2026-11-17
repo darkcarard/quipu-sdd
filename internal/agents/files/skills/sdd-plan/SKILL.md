@@ -1,9 +1,12 @@
 ---
+name: sdd-plan
 description: Draft or continue the implementation plan of a feature with sdd (Spec-Driven Development), once its functional and technical specs are approved. Use when the user wants to plan how an approved feature will be built, task by task.
 argument-hint: <feature>
 ---
 
-Draft the implementation plan of this feature with the user: $ARGUMENTS
+Draft the implementation plan of a feature with the user.
+
+Feature: {{args}}
 
 Use the `sdd` MCP tools (if they are not available, run the equivalent `sdd` commands in the shell).
 
