@@ -115,10 +115,11 @@ func plural(n int, word string) string {
 // featureArgs resolves an optional feature argument to the list of features to act on.
 func featureArgs(l state.Layout, args []string) ([]string, error) {
 	if len(args) > 0 {
-		if err := feature.ValidName(args[0]); err != nil {
+		name, err := feature.Resolve(l, args[0])
+		if err != nil {
 			return nil, err
 		}
-		return args[:1], nil
+		return []string{name}, nil
 	}
 	return feature.List(l)
 }

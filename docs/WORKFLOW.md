@@ -49,7 +49,7 @@ If a source changes after approval, every artifact that depends on it becomes **
 
 | Command | Purpose |
 |---|---|
-| `sdd spec new <feature> [--title "<title>"]` | Create `specs/<feature>/functional.md` from the template |
+| `sdd spec new <feature or "Free text"> [--name <feature>] [--title "<title>"] [--description "<text>"]` | Create `specs/<feature>/functional.md` from the template and record the feature name, title and description (see [feature names](SPEC_GUIDELINES.md#project-layout)) |
 | `sdd spec new <feature> --technical` | Create `technical.md` from the template to write it by hand. Only allowed after functional approval |
 | `sdd spec chat <feature> --functional` | Interactive drafting session with the agent |
 | `sdd spec lint [<feature>]` | Deterministic guardrail checks (see [SPEC_GUIDELINES.md](SPEC_GUIDELINES.md)) |

@@ -60,7 +60,7 @@ func TestHandWrittenSpecWorkflow(t *testing.T) {
 	mustRun(t, dir, ExitOK, "init")
 	contains(t, mustRun(t, dir, ExitOK, "status"), "No features yet")
 
-	contains(t, mustRun(t, dir, ExitError, "spec", "new", "Bad_Name"), "kebab-case")
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "x", "--name", "Bad_Name"), "invalid feature name")
 	contains(t, mustRun(t, dir, ExitOK, "spec", "new", sddtest.Feature), "created  specs/user-signup/functional.md")
 	contains(t, mustRun(t, dir, ExitError, "spec", "lint"), "template placeholder <requirement title>")
 	contains(t, mustRun(t, dir, ExitError, "spec", "approve", sddtest.Feature, "--functional"), "not approved")
@@ -93,7 +93,7 @@ func TestHandWrittenSpecWorkflow(t *testing.T) {
 
 	// Editing the approved functional spec marks the technical spec and the plan stale.
 	writeSpec(t, dir, "functional.md", strings.Replace(sddtest.Functional, "p95 < 300 ms", "p95 < 250 ms", 1))
-	contains(t, mustRun(t, dir, ExitOK, "status"), "user-signup  functional-drafting  modified    stale      stale")
+	contains(t, mustRun(t, dir, ExitOK, "status"), "user-signup  User Signup  functional-drafting  modified    stale      stale")
 	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature),
 		"Phase:   functional-drafting (state.json still says plan-approved", "technical.md   stale",
 		"Next: review your edits to specs/user-signup/functional.md, then run `sdd spec approve user-signup --functional`")
@@ -102,6 +102,38 @@ func TestHandWrittenSpecWorkflow(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".sdd", "locks", sddtest.Feature+".lock")); !os.IsNotExist(err) {
 		t.Errorf("the feature lock must be released: %v", err)
 	}
+}
+
+func TestFreeTextFeatureNames(t *testing.T) {
+	dir := t.TempDir()
+	mustRun(t, dir, ExitOK, "init")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "new", "Registro de Usuarios (v2)", "--description", "Alta con email"),
+		"feature  registro-de-usuarios-v2: Registro de Usuarios (v2)", "created  specs/registro-de-usuarios-v2/functional.md")
+	b, err := os.ReadFile(filepath.Join(dir, "specs", "registro-de-usuarios-v2", "functional.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contains(t, string(b), "id: registro-de-usuarios-v2", "title: Registro de Usuarios (v2)", "Alta con email")
+	st, err := os.ReadFile(filepath.Join(dir, ".sdd", "features", "registro-de-usuarios-v2", "state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	contains(t, string(st), `"title": "Registro de Usuarios (v2)"`, `"description": "Alta con email"`, `"created_by": "Ada <ada@example.com>"`)
+
+	// The same text maps to the existing feature; --name picks another one.
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "registro de usuarios (V2)"), "already exists: choose another name with --name")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "new", "Registro de Usuarios (v2)", "--name", "signup-v3"), "feature  signup-v3: Registro de Usuarios (v2)")
+
+	// Other commands accept the name, the text or the title.
+	for _, arg := range []string{"registro-de-usuarios-v2", "Registro de usuarios (v2)"} {
+		contains(t, mustRun(t, dir, ExitOK, "status", arg), "Feature: registro-de-usuarios-v2 (Registro de Usuarios (v2))", "Alta con email")
+	}
+	contains(t, mustRun(t, dir, ExitOK, "status"), "registro-de-usuarios-v2  Registro de Usuarios (v2)")
+
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "con"), "reserved")
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "x", "--name", "approve"), "reserved")
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "¿?"), "cannot derive a feature name")
+	contains(t, mustRun(t, dir, ExitError, "status", "nope"), "feature not found")
 }
 
 func TestSubcommandUsage(t *testing.T) {

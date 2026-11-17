@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -25,19 +24,6 @@ import (
 
 // ErrNotFound is returned when a feature has neither a spec directory nor state.
 var ErrNotFound = errors.New("feature not found")
-
-var nameRe = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-
-// MaxNameLen bounds feature names, which are also used in branch names.
-const MaxNameLen = 64
-
-// ValidName checks that a feature name is kebab-case (it becomes branch sdd/<feature>).
-func ValidName(name string) error {
-	if !nameRe.MatchString(name) || len(name) > MaxNameLen {
-		return fmt.Errorf("invalid feature name %q: use kebab-case (lowercase letters, digits and single hyphens, at most %d characters), e.g. user-signup", name, MaxNameLen)
-	}
-	return nil
-}
 
 // FileName returns the file name of an artifact inside specs/<feature>/.
 func FileName(a workflow.Artifact) string { return string(a) + ".md" }

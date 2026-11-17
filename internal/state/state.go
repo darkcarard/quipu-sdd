@@ -3,6 +3,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,7 +106,14 @@ func WriteFileAtomic(path string, data []byte, perm os.FileMode) (err error) {
 // FeatureState is the checkpoint persisted in .sdd/features/<feature>/state.json.
 // See docs/TRACEABILITY.md §3.
 type FeatureState struct {
-	Feature   string                                  `json:"feature"`
+	Feature string `json:"feature"`
+	// Title and Description are the human-readable side of the feature name
+	// (the sanitized slug in Feature). They are not part of any approved content.
+	Title       string    `json:"title,omitempty"`
+	Description string    `json:"description,omitempty"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+	CreatedBy   string    `json:"created_by,omitempty"`
+
 	Phase     workflow.Phase                          `json:"phase"`
 	Approvals map[workflow.Artifact]workflow.Approval `json:"approvals,omitempty"`
 	Groups    []GroupState                            `json:"groups,omitempty"`
@@ -172,9 +180,12 @@ func (l Layout) Save(s FeatureState) error {
 		return errors.New("state: feature name is required")
 	}
 	s.UpdatedAt = time.Now().UTC()
-	b, err := json.MarshalIndent(s, "", "  ")
-	if err != nil {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false) // keep "Name <email>" readable in a committed file
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(s); err != nil {
 		return err
 	}
-	return WriteFileAtomic(l.StateFile(s.Feature), append(b, '\n'), 0o644)
+	return WriteFileAtomic(l.StateFile(s.Feature), buf.Bytes(), 0o644)
 }

@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/darkcarard/sdd-framework/internal/config"
 	"github.com/darkcarard/sdd-framework/internal/diag"
 	"github.com/darkcarard/sdd-framework/internal/feature"
+	"github.com/darkcarard/sdd-framework/internal/state"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
-const specUsage = `sdd spec new <feature> [--technical] [--title "<title>"]
+const specUsage = `sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"]
+       sdd spec new <feature> --technical
        sdd spec lint [<feature>]
        sdd spec approve <feature> --functional|--technical
        sdd spec chat <feature> --functional|--technical   (M3)`
@@ -39,30 +43,71 @@ func (a *App) runSpec(ctx context.Context, args []string) error {
 func (a *App) runSpecNew(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("spec new")
 	technical := fs.Bool("technical", false, "create technical.md (requires an approved functional spec)")
-	title := fs.String("title", "", "feature title (default: derived from the name or the functional spec)")
+	name := fs.String("name", "", "feature name to use instead of the one derived from the argument")
+	title := fs.String("title", "", "human-readable title (default: the argument when it is free text)")
+	desc := fs.String("description", "", "one-line description, stored in state.json and the Summary")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err
 	}
-	if len(pos) != 1 {
-		return a.usageErr(`sdd spec new <feature> [--technical] [--title "<title>"]`)
+	if len(pos) > 1 || (len(pos) == 0 && *name == "") {
+		return a.usageErr(`sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"] [--technical]`)
 	}
-	art := workflow.Functional
-	if *technical {
-		art = workflow.Technical
-	}
-	return a.create(ctx, pos[0], art, *title)
-}
-
-// create writes a new artifact from its template under the feature lock.
-func (a *App) create(ctx context.Context, name string, art workflow.Artifact, title string) error {
-	if err := feature.ValidName(name); err != nil {
-		return err
+	arg := ""
+	if len(pos) == 1 {
+		arg = pos[0]
 	}
 	l, cfg, err := a.project()
 	if err != nil {
 		return err
 	}
+	if *technical {
+		slug := *name
+		if slug == "" {
+			if slug, err = feature.Resolve(l, arg); err != nil {
+				return err
+			}
+		} else if err := feature.ValidName(slug); err != nil {
+			return err
+		}
+		return a.create(ctx, l, cfg, slug, workflow.Technical, feature.Info{})
+	}
+	slug, info, err := newFeatureName(arg, *name, *title, *desc)
+	if err != nil {
+		return err
+	}
+	return a.create(ctx, l, cfg, slug, workflow.Functional, info)
+}
+
+// newFeatureName decides the feature name and title of a new feature. A valid
+// name is used as is; free text is slugified and kept as the title; --name
+// overrides the derived name.
+func newFeatureName(arg, name, title, desc string) (string, feature.Info, error) {
+	info := feature.Info{Title: title, Description: desc}
+	switch {
+	case name != "":
+		if err := feature.ValidName(name); err != nil {
+			return "", info, err
+		}
+		if info.Title == "" && arg != name {
+			info.Title = arg
+		}
+		return name, info, nil
+	case feature.ValidName(arg) == nil:
+		return arg, info, nil
+	}
+	slug, err := feature.Slugify(arg)
+	if err != nil {
+		return "", info, err
+	}
+	if info.Title == "" {
+		info.Title = strings.Join(strings.Fields(arg), " ")
+	}
+	return slug, info, nil
+}
+
+// create writes a new artifact from its template under the feature lock.
+func (a *App) create(ctx context.Context, l state.Layout, cfg config.Config, name string, art workflow.Artifact, info feature.Info) error {
 	who, err := a.identity(ctx)
 	if err != nil {
 		return err
@@ -72,9 +117,10 @@ func (a *App) create(ctx context.Context, name string, art workflow.Artifact, ti
 		if err != nil {
 			return err
 		}
-		if _, err := f.Create(art, title, who, a.now()); err != nil {
+		if _, err := f.Create(art, info, who, a.now()); err != nil {
 			return err
 		}
+		fmt.Fprintf(a.Stdout, "feature  %s: %s\n", f.Name, f.Title())
 		fmt.Fprintf(a.Stdout, "created  %s\n", f.Files[art].Rel)
 		fmt.Fprintf(a.Stdout, "\nNext: %s\n", f.Next())
 		return nil
@@ -145,11 +191,11 @@ func (a *App) runSpecApprove(ctx context.Context, args []string) error {
 
 // approve freezes an artifact under the feature lock and reports the outcome.
 func (a *App) approve(ctx context.Context, name string, art workflow.Artifact) error {
-	if err := feature.ValidName(name); err != nil {
-		return err
-	}
 	l, cfg, err := a.project()
 	if err != nil {
+		return err
+	}
+	if name, err = feature.Resolve(l, name); err != nil {
 		return err
 	}
 	who, err := a.identity(ctx)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/workflow"
 )
 
@@ -26,7 +27,15 @@ func (a *App) runPlan(ctx context.Context, args []string) error {
 			return a.usageErr("sdd plan " + args[0] + " <feature>")
 		}
 		if args[0] == "new" {
-			return a.create(ctx, pos[0], workflow.Plan, "")
+			l, cfg, err := a.project()
+			if err != nil {
+				return err
+			}
+			name, err := feature.Resolve(l, pos[0])
+			if err != nil {
+				return err
+			}
+			return a.create(ctx, l, cfg, name, workflow.Plan, feature.Info{})
 		}
 		return a.approve(ctx, pos[0], workflow.Plan)
 	case "-h", "--help", "help":

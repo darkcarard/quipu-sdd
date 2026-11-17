@@ -39,7 +39,7 @@ specs/<feature>/             # functional.md, technical.md, plan.md
 ## Workflow so far (M1)
 
 ```sh
-sdd spec new user-signup                 # write specs/user-signup/functional.md
+sdd spec new "User Signup" --description "Sign up with email"   # → specs/user-signup/functional.md
 sdd spec lint user-signup                # deterministic guardrails
 sdd spec approve user-signup --functional
 sdd spec new user-signup --technical     # write technical.md, then approve it with --technical

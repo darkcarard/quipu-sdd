@@ -16,6 +16,7 @@ Guardrails: docs/SPEC_GUIDELINES.md. Run `sdd spec lint` before approving.
 ## Summary
 
 <!-- Two or three sentences: what this feature delivers and for whom. -->
+{{description}}
 
 ## Problem & Goals
 

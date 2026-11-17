@@ -60,29 +60,64 @@ func Open(l state.Layout, cfg config.Config, name string) (*Feature, error) {
 	return f, f.reload()
 }
 
+// Info is the human-readable description of a feature, recorded in state.json
+// when its functional spec is created.
+type Info struct {
+	Title       string
+	Description string
+}
+
+// Title returns the feature title: the one recorded in state.json, else the
+// functional spec frontmatter, else one derived from the name.
+func (f *Feature) Title() string {
+	switch {
+	case f.State.Title != "":
+		return f.State.Title
+	case f.Functional != nil && f.Functional.Meta.Title != "":
+		return f.Functional.Meta.Title
+	}
+	return TitleFromName(f.Name)
+}
+
 // Create writes an artifact from its template (the project copy in .sdd/templates
 // when present, else the built-in one). The technical spec requires an approved
 // functional spec, and the plan an approved technical spec. Source hashes are
 // stamped into the new file. It returns the path written.
-func (f *Feature) Create(a workflow.Artifact, title string, who Identity, now time.Time) (string, error) {
+//
+// Creating the functional spec of a new feature also records info (title and
+// description), the creation time and the creator in state.json.
+func (f *Feature) Create(a workflow.Artifact, info Info, who Identity, now time.Time) (string, error) {
 	file := f.Files[a]
 	if file.Exists {
+		if a == workflow.Functional {
+			return "", fmt.Errorf("feature %s (%q) already exists: choose another name with --name", f.Name, f.Title())
+		}
 		return "", fmt.Errorf("%s already exists", file.Rel)
 	}
 	if err := f.requireSources(a); err != nil {
 		return "", err
 	}
-	if title == "" && f.Functional != nil {
-		title = f.Functional.Meta.Title
-	}
-	if title == "" {
-		title = TitleFromName(f.Name)
+	if a == workflow.Functional {
+		if t := strings.TrimSpace(info.Title); t != "" {
+			f.State.Title = t
+		}
+		if d := strings.TrimSpace(info.Description); d != "" {
+			f.State.Description = d
+		}
+		if f.State.Title == "" {
+			f.State.Title = TitleFromName(f.Name)
+		}
+		if f.State.CreatedAt.IsZero() {
+			f.State.CreatedAt, f.State.CreatedBy = now.UTC(), who.String()
+		}
 	}
 	tpl, err := f.template(FileName(a))
 	if err != nil {
 		return "", err
 	}
-	content := []byte(templates.Render(tpl, map[string]string{"feature": f.Name, "title": title}))
+	content := []byte(templates.Render(tpl, map[string]string{
+		"feature": f.Name, "title": f.Title(), "description": f.State.Description,
+	}))
 	if content, err = f.stamp(a, content); err != nil {
 		return "", fmt.Errorf("%s template: %w", FileName(a), err)
 	}
@@ -106,22 +141,12 @@ func (f *Feature) Create(a workflow.Artifact, title string, who Identity, now ti
 	}
 	if err := f.record(journal.Event{
 		Actor: who.Actor(), Phase: string(f.Phase), Action: action, Status: journal.Info,
-		Hashes: map[string]string{string(a): f.Files[a].Hash}, Detail: "created " + file.Rel + " from template",
+		Hashes: map[string]string{string(a): f.Files[a].Hash},
+		Detail: fmt.Sprintf("created %s from template (%q)", file.Rel, f.Title()),
 	}); err != nil {
 		return "", err
 	}
 	return file.Path, nil
-}
-
-// TitleFromName turns a kebab-case feature name into a title ("user-signup" → "User Signup").
-func TitleFromName(name string) string {
-	words := strings.Split(name, "-")
-	for i, w := range words {
-		if w != "" {
-			words[i] = strings.ToUpper(w[:1]) + w[1:]
-		}
-	}
-	return strings.Join(words, " ")
 }
 
 func (f *Feature) template(name string) (string, error) {

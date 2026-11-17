@@ -61,7 +61,7 @@ Recovery rests on three principles:
 
 | Mechanism | Where | Purpose |
 |---|---|---|
-| `state.json` | `.sdd/features/<feature>/` | Current phase, group and task, the status of each task, attempts, `run_id`, worktree, branch and last checkpoint SHA. Written atomically (temp file + `rename`) |
+| `state.json` | `.sdd/features/<feature>/` | Feature title and description (the human side of the feature name), who created it and when, the approvals, the current phase, group and task, the status of each task, attempts, `run_id`, worktree, branch and last checkpoint SHA. Written atomically (temp file + `rename`) |
 | Write-ahead events | `journal.jsonl` | A `started` event is appended before an action, and a `completed` or `failed` event whose `ref` points to it is appended after. A `started` event that no other event references marks an interrupted action |
 | WIP commits | branch `sdd/<feature>` | One checkpoint commit per finished task, squashed into a single commit when the group passes |
 | Chat sessions | `.sdd/features/<feature>/sessions/` | Phase 1 conversation history. The draft spec is also saved to disk after every agent turn |

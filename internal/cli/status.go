@@ -29,7 +29,11 @@ func (a *App) runStatus(_ context.Context, args []string) error {
 		return err
 	}
 	if len(pos) == 1 {
-		f, err := feature.Load(l, cfg, pos[0])
+		name, err := feature.Resolve(l, pos[0])
+		if err != nil {
+			return err
+		}
+		f, err := feature.Load(l, cfg, name)
 		if err != nil {
 			return err
 		}
@@ -45,14 +49,14 @@ func (a *App) runStatus(_ context.Context, args []string) error {
 		return nil
 	}
 	tw := tabwriter.NewWriter(a.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "FEATURE\tPHASE\tFUNCTIONAL\tTECHNICAL\tPLAN")
+	fmt.Fprintln(tw, "FEATURE\tTITLE\tPHASE\tFUNCTIONAL\tTECHNICAL\tPLAN")
 	for _, n := range names {
 		f, err := feature.Load(l, cfg, n)
 		if err != nil {
-			fmt.Fprintf(tw, "%s\t(error: %v)\t\t\t\n", n, err)
+			fmt.Fprintf(tw, "%s\t\t(error: %v)\t\t\t\n", n, err)
 			continue
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", n, f.Phase,
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", n, truncate(f.Title(), 30), f.Phase,
 			f.Statuses[workflow.Functional], f.Statuses[workflow.Technical], f.Statuses[workflow.Plan])
 	}
 	if err := tw.Flush(); err != nil {
@@ -64,7 +68,10 @@ func (a *App) runStatus(_ context.Context, args []string) error {
 
 func (a *App) featureStatus(f *feature.Feature) error {
 	w := a.Stdout
-	fmt.Fprintf(w, "Feature: %s\n", f.Name)
+	fmt.Fprintf(w, "Feature: %s (%s)\n", f.Name, f.Title())
+	if f.State.Description != "" {
+		fmt.Fprintf(w, "         %s\n", f.State.Description)
+	}
 	fmt.Fprintf(w, "Phase:   %s", f.Phase)
 	if f.Saved && f.State.Phase != f.Phase {
 		fmt.Fprintf(w, " (state.json still says %s; updated on the next approval)", f.State.Phase)
@@ -119,4 +126,11 @@ func (a *App) featureStatus(f *feature.Feature) error {
 
 	fmt.Fprintf(w, "\nNext: %s\n", f.Next())
 	return nil
+}
+
+func truncate(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
 }

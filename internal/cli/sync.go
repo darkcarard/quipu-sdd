@@ -93,7 +93,11 @@ func (a *App) runTrace(_ context.Context, args []string) error {
 	}
 
 	if *matrix {
-		ix, err := index(pos[0])
+		name, err := feature.Resolve(l, pos[0])
+		if err != nil {
+			return err
+		}
+		ix, err := index(name)
 		if err != nil {
 			return err
 		}
@@ -104,7 +108,11 @@ func (a *App) runTrace(_ context.Context, args []string) error {
 	id := pos[0]
 	var names []string
 	if feat, rest, ok := strings.Cut(id, "/"); ok {
-		names, id = []string{feat}, rest
+		name, err := feature.Resolve(l, feat)
+		if err != nil {
+			return err
+		}
+		names, id = []string{name}, rest
 	} else if names, err = feature.List(l); err != nil {
 		return err
 	}

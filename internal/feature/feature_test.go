@@ -58,18 +58,6 @@ func approve(t *testing.T, l state.Layout, a workflow.Artifact) *Feature {
 	return f
 }
 
-func TestValidName(t *testing.T) {
-	for name, ok := range map[string]bool{
-		"user-signup": true, "a1": true, "v2-api": true,
-		"User": false, "user_signup": false, "-x": false, "x-": false, "a--b": false, "": false,
-		strings.Repeat("a", MaxNameLen+1): false,
-	} {
-		if err := ValidName(name); (err == nil) != ok {
-			t.Errorf("ValidName(%q) = %v", name, err)
-		}
-	}
-}
-
 func TestLoadUnknownFeature(t *testing.T) {
 	l := setup(t)
 	if _, err := Load(l, config.Default(), "nope"); !errors.Is(err, ErrNotFound) {
@@ -83,10 +71,10 @@ func TestCreateFromTemplates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Create(workflow.Technical, "", who, now); err == nil || !strings.Contains(err.Error(), "functional.md does not exist") {
+	if _, err := f.Create(workflow.Technical, Info{}, who, now); err == nil || !strings.Contains(err.Error(), "functional.md does not exist") {
 		t.Fatalf("technical before functional: %v", err)
 	}
-	path, err := f.Create(workflow.Functional, "", who, now)
+	path, err := f.Create(workflow.Functional, Info{}, who, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +82,7 @@ func TestCreateFromTemplates(t *testing.T) {
 	if !strings.Contains(string(b), "id: user-signup") || !strings.Contains(string(b), "# User Signup: Functional Specification") {
 		t.Errorf("template not rendered:\n%s", b)
 	}
-	if _, err := f.Create(workflow.Functional, "", who, now); err == nil {
+	if _, err := f.Create(workflow.Functional, Info{}, who, now); err == nil {
 		t.Error("creating an existing artifact must fail")
 	}
 	st, err := l.Load(sddtest.Feature)
@@ -107,7 +95,7 @@ func TestCreateFromTemplates(t *testing.T) {
 		t.Fatal(err)
 	}
 	g, _ := Open(l, config.Default(), "other")
-	path, err = g.Create(workflow.Functional, "Other Thing", who, now)
+	path, err = g.Create(workflow.Functional, Info{Title: "Other Thing"}, who, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +134,7 @@ func TestApproveChainAndStaleness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Create(workflow.Plan, "", who, now); err != nil {
+	if _, err := f.Create(workflow.Plan, Info{}, who, now); err != nil {
 		t.Fatal(err)
 	}
 	write(t, l, workflow.Plan, sddtest.Plan)

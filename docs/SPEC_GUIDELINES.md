@@ -18,7 +18,12 @@ These are the rules every spec and plan must follow. Items marked **[lint]** are
     features/<feature>/   # state, journal, sessions, report
 ```
 
-- One directory per feature. Feature names are kebab-case, unique and stable, because they are used in branch names (`sdd/<feature>`). **[lint]**
+- One directory per feature. The **feature name** is unique and stable, because it is used in directory names, the lock file and the branch `sdd/<feature>`. It must be: **[lint]**
+  - lowercase ASCII letters and digits in words joined by single hyphens (`user-signup`, `api-v2`);
+  - at most 40 characters;
+  - not reserved: Windows device names (`con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9`) or the subcommands `new`, `lint`, `approve`, `chat`, `check`, `help`.
+- `sdd spec new` also accepts free text and derives the name from it: lowercase, accents removed (`á→a`, `ñ→n`, `ß→ss`), every other symbol becomes a hyphen, and a long name is cut at a word boundary. `"Registro de Usuarios (v2)!"` becomes `registro-de-usuarios-v2`. Use `--name` to choose the name yourself.
+- The free text is kept as the feature **title**, together with an optional `--description`, in `.sdd/features/<feature>/state.json`. They sit outside the approved specs, so changing them never requires a re-approval. Every command accepts the feature name, the original text or the title.
 - Cross-feature dependencies are declared in the frontmatter (`depends_on: [other-feature]`), not by copying content.
 - Keep a feature small enough that its plan has roughly 3 to 8 groups. Split larger work into several features. **[warn]**
 
