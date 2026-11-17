@@ -1,4 +1,4 @@
-// Command sdd is the Spec-Driven Development framework CLI.
+// Command sdd is the CLI of Quipu, Spec-Driven Development for coding agents.
 package main
 
 import (

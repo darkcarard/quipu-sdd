@@ -53,7 +53,7 @@ type command struct {
 func (a *App) commands() []command {
 	return []command{
 		{name: "init", summary: "Set up sdd in the current project (and an agent with --agent)", run: (*App).runInit},
-		{name: "version", summary: "Print the sdd version", run: (*App).runVersion},
+		{name: "version", summary: "Print the Quipu (sdd) version", run: (*App).runVersion},
 		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
 		{name: "guide", summary: "Print the drafting instructions and template for a topic", run: (*App).runGuide},
 		{name: "mcp", summary: "Serve sdd to a coding agent over MCP (stdio)", run: (*App).runMCP},
@@ -120,7 +120,7 @@ var (
 )
 
 func (a *App) usage(w io.Writer) {
-	fmt.Fprintln(w, "sdd: Spec-Driven Development framework")
+	fmt.Fprintln(w, "Quipu: Spec-Driven Development for coding agents")
 	fmt.Fprintln(w, "\nUsage: sdd <command> [arguments]\n\nCommands:")
 	for _, c := range a.commands() {
 		note := ""
@@ -179,7 +179,7 @@ func (a *App) runVersion(_ context.Context, args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Stdout, "sdd %s (layout v%d, %s, %s/%s)\n",
+	fmt.Fprintf(a.Stdout, "sdd %s (Quipu, layout v%d, %s, %s/%s)\n",
 		version.Version, version.LayoutVersion, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	return nil
 }
