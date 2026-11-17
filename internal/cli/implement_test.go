@@ -111,7 +111,11 @@ func TestImplementWorkflowCLI(t *testing.T) {
 // approval commits the specs and records, the review commands take group IDs,
 // and `sdd merge` merges into the project's branch even when run from inside
 // the worktree.
-func TestApprovalCommitsAndMerge(t *testing.T) {
+// validatedProject implements and validates the fixture feature through the
+// CLI, with the review commands addressed by group ID. It returns the project,
+// the worktree and a git runner.
+func validatedProject(t *testing.T) (string, string, func(args ...string) string) {
+	t.Helper()
 	dir := gitProject(t)
 	ctx := context.Background()
 	g := workspace.Git{Dir: dir}
@@ -150,6 +154,11 @@ func TestApprovalCommitsAndMerge(t *testing.T) {
 	}
 	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "only a validated feature can be merged")
 	contains(t, mustRun(t, dir, ExitOK, "validate", sddtest.Feature), "validation PASSED", "`sdd merge user-signup`")
+	return dir, wt, git
+}
+
+func TestApprovalCommitsAndMerge(t *testing.T) {
+	dir, wt, git := validatedProject(t)
 
 	// From inside the worktree, as an agent's shared shell would be.
 	out := mustRun(t, filepath.Join(wt, "internal"), ExitOK, "merge")
@@ -165,4 +174,25 @@ func TestApprovalCommitsAndMerge(t *testing.T) {
 	}
 	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "already merged into main")
 	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature), "git branch -d sdd/user-signup")
+}
+
+// TestMergeRecordsAnOutsideMerge: a feature merged with git by hand (branch
+// deleted, worktree removed) is recorded by `sdd merge` without merging again.
+func TestMergeRecordsAnOutsideMerge(t *testing.T) {
+	dir, wt, git := validatedProject(t)
+	git("merge", "--ff-only", "sdd/user-signup")
+	git("worktree", "remove", wt)
+	git("branch", "-d", "sdd/user-signup")
+	contains(t, mustRun(t, dir, ExitOK, "clean", sddtest.Feature), "nothing to remove")
+	contains(t, mustRun(t, dir, ExitOK, "merge"), "sdd/user-signup was already merged into main: recorded the merge",
+		"committed the specs and records", "Next: nothing: sdd/user-signup was merged into main")
+	contains(t, git("log", "-1", "--format=%s"), "sdd(user-signup): records of the merge into main")
+}
+
+// A deleted branch whose work never reached the current branch is not recorded.
+func TestMergeNeedsTheWorkOnTheBranch(t *testing.T) {
+	dir, _, git := validatedProject(t)
+	mustRun(t, dir, ExitOK, "clean", sddtest.Feature)
+	git("branch", "-D", "sdd/user-signup")
+	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "branch sdd/user-signup not found, and its validated commit")
 }

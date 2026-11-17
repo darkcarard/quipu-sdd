@@ -396,11 +396,14 @@ func FormatValidation(r validate.Result) string {
 // FormatMerged renders the result of `sdd merge`.
 func FormatMerged(r Merged) string {
 	var sb strings.Builder
-	how := "with a merge commit"
-	if r.FF {
-		how = "fast-forward"
+	switch {
+	case r.Already:
+		fmt.Fprintf(&sb, "%s was already merged into %s: recorded the merge (%s)\n", r.Branch, r.Into, Short(r.SHA))
+	case r.FF:
+		fmt.Fprintf(&sb, "merged %s into %s (fast-forward, %s)\n", r.Branch, r.Into, Short(r.SHA))
+	default:
+		fmt.Fprintf(&sb, "merged %s into %s (with a merge commit, %s)\n", r.Branch, r.Into, Short(r.SHA))
 	}
-	fmt.Fprintf(&sb, "merged %s into %s (%s, %s)\n", r.Branch, r.Into, how, Short(r.SHA))
 	if r.Removed {
 		sb.WriteString("removed the worktree; the branch is kept\n")
 	}

@@ -360,9 +360,9 @@ func (f *Feature) Next() string {
 		return fmt.Sprintf("nothing: the baseline is approved. New features that build on this code declare `depends_on: [%s]`; if one changes adopted behavior, revise this baseline's specs and re-approve them", n)
 	case workflow.Validated:
 		if m := f.State.Merged; m != nil {
-			return fmt.Sprintf("nothing: sdd/%s was merged into %s; delete the branch with `git branch -d sdd/%s` once you no longer need it", n, m.Into, n)
+			return fmt.Sprintf("nothing: sdd/%s was merged into %s; if the branch still exists, delete it with `git branch -d sdd/%s` once you no longer need it", n, m.Into, n)
 		}
-		return fmt.Sprintf("merge it with `sdd merge %s` (into the branch checked out in the project, from any directory; removes the worktree), or merge sdd/%s your own way (PR, rebase) and run `sdd clean %s`", n, n, n)
+		return fmt.Sprintf("merge it with `sdd merge %s` (into the branch checked out in the project, from any directory; removes the worktree), or merge sdd/%s your own way (PR, rebase) and then run `sdd merge %s` to record it", n, n, n)
 	}
 	return ""
 }

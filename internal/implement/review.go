@@ -221,7 +221,8 @@ func Clean(ctx context.Context, s *Session, force bool) (string, error) {
 	f := s.F
 	wt := workspace.Open(s.worktreeDir(), workspace.Branch(f.Name))
 	if !wt.Exists() {
-		return "", fmt.Errorf("there is no worktree at %s", s.worktreeDir())
+		_, _ = workspace.Git{Dir: f.Layout.Root}.Run(ctx, "worktree", "prune")
+		return fmt.Sprintf("there is no worktree at %s: nothing to remove", s.worktreeDir()), nil
 	}
 	if !force {
 		dirty, err := wt.Changed(ctx)

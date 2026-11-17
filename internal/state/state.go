@@ -136,11 +136,13 @@ type FeatureState struct {
 
 // Merge records where a validated feature's branch was merged.
 type Merge struct {
-	Into string    `json:"into"`         // the branch merged into
-	SHA  string    `json:"sha"`          // its HEAD after the merge
-	FF   bool      `json:"ff,omitempty"` // fast-forward
-	By   string    `json:"by"`
-	At   time.Time `json:"at"`
+	Into string `json:"into"`         // the branch merged into
+	SHA  string `json:"sha"`          // its HEAD after the merge
+	FF   bool   `json:"ff,omitempty"` // fast-forward
+	// Outside is set when the branch had already been merged outside sdd.
+	Outside bool      `json:"outside,omitempty"`
+	By      string    `json:"by"`
+	At      time.Time `json:"at"`
 }
 
 // Cursor points at the work in progress.
