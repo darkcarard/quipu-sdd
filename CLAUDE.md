@@ -11,8 +11,9 @@ Context for Claude Code sessions on this repository, on any machine.
 - `docs/ROADMAP.md`: milestones and exit criteria
 
 ## Current status
-- **M0 (scaffold): done.** `sdd init` and `sdd version` work; the other commands are stubs that name their milestone.
-- **Next: M1.** Spec and plan parsers, deterministic lint, the workflow state machine wired to commands, `sdd status`, `sdd spec new/lint/approve`, `sdd plan approve`, staleness detection, `sync check` (spec↔spec, spec↔plan) and `trace` over specs and plan.
+- **M0 (scaffold): done.** `sdd init` and `sdd version`.
+- **M1 (specs, plans and state): done.** `sdd status`, `sdd spec new [--technical]/lint/approve`, `sdd plan new/approve`, `sdd sync check` (spec↔spec, spec↔plan, approvals) and `sdd trace <ID>|--matrix`. Specs and plans are written by hand for now; the phase is derived from artifacts and approvals (`workflow.Effective`) up to `plan-approved`.
+- **Next: M2.** Anthropic provider over `net/http`: SSE streaming, tool use, retries and backoff, usage accounting, redacted transcripts, contract tests with recorded fixtures.
 
 Update this section whenever a milestone is completed.
 
@@ -39,12 +40,18 @@ make install # go install with version ldflags
 
 ## Layout
 - `cmd/sdd`: entry point and signal handling
-- `internal/cli`: the command dispatcher and `init`
+- `internal/cli`: the command dispatcher, `init` and thin command wrappers over `internal/feature`
 - `internal/config`: configuration (`sdd.yaml` plus `.env` and environment variables)
-- `internal/workflow`: phases, transitions, `Evaluate` (staleness)
+- `internal/workflow`: phases, transitions, `Evaluate` (staleness), `Effective` (derived phase)
 - `internal/state`: `Layout` paths, atomic writes, `FeatureState`
 - `internal/journal`: append-only JSONL with start/end pairing
 - `internal/lock`: per-feature lock
 - `internal/templates`: embedded templates and profiles
-- `internal/spec`, `internal/plan`, `internal/trace`: types only (M1)
+- `internal/markdown`: line-oriented reader (frontmatter, headings, bullets, tables) with line numbers; `SetFrontmatter` stamps hashes
+- `internal/diag`: lint/sync diagnostics (`file:line: severity: message`)
+- `internal/spec`: functional/technical parsers, lint, `CheckTechnical` (spec↔spec)
+- `internal/plan`: plan parser, `Validate` (structure), `CheckCoverage` (spec↔plan)
+- `internal/trace`: ID index over specs and plan, tree rendering and matrix
+- `internal/feature`: use cases on one feature (load, lint, sync, create from template, approve, next action); the CLI and later the orchestrator call it
+- `internal/sddtest`: a valid fixture feature shared by tests
 - `internal/provider`, `internal/provider/anthropic`, `internal/tools`, `internal/workspace`, `internal/orchestrator`: interfaces and stubs

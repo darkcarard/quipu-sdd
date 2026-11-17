@@ -1,0 +1,259 @@
+package feature
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/darkcarard/sdd-framework/internal/config"
+	"github.com/darkcarard/sdd-framework/internal/journal"
+	"github.com/darkcarard/sdd-framework/internal/sddtest"
+	"github.com/darkcarard/sdd-framework/internal/state"
+	"github.com/darkcarard/sdd-framework/internal/workflow"
+)
+
+var (
+	who = Identity{Name: "Ada", Email: "ada@example.com"}
+	now = time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC)
+)
+
+func setup(t *testing.T) state.Layout {
+	t.Helper()
+	l := state.Layout{Root: t.TempDir()}
+	if err := l.Init(); err != nil {
+		t.Fatal(err)
+	}
+	return l
+}
+
+func write(t *testing.T, l state.Layout, a workflow.Artifact, content string) {
+	t.Helper()
+	p := filepath.Join(l.SpecDir(sddtest.Feature), FileName(a))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func load(t *testing.T, l state.Layout) *Feature {
+	t.Helper()
+	f, err := Load(l, config.Default(), sddtest.Feature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func approve(t *testing.T, l state.Layout, a workflow.Artifact) *Feature {
+	t.Helper()
+	f := load(t, l)
+	if ds, err := f.Approve(a, who, now); err != nil {
+		t.Fatalf("approve %s: %v\n%v", a, err, ds)
+	}
+	return f
+}
+
+func TestValidName(t *testing.T) {
+	for name, ok := range map[string]bool{
+		"user-signup": true, "a1": true, "v2-api": true,
+		"User": false, "user_signup": false, "-x": false, "x-": false, "a--b": false, "": false,
+		strings.Repeat("a", MaxNameLen+1): false,
+	} {
+		if err := ValidName(name); (err == nil) != ok {
+			t.Errorf("ValidName(%q) = %v", name, err)
+		}
+	}
+}
+
+func TestLoadUnknownFeature(t *testing.T) {
+	l := setup(t)
+	if _, err := Load(l, config.Default(), "nope"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestCreateFromTemplates(t *testing.T) {
+	l := setup(t)
+	f, err := Open(l, config.Default(), sddtest.Feature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Create(workflow.Technical, "", who, now); err == nil || !strings.Contains(err.Error(), "functional.md does not exist") {
+		t.Fatalf("technical before functional: %v", err)
+	}
+	path, err := f.Create(workflow.Functional, "", who, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(path)
+	if !strings.Contains(string(b), "id: user-signup") || !strings.Contains(string(b), "# User Signup: Functional Specification") {
+		t.Errorf("template not rendered:\n%s", b)
+	}
+	if _, err := f.Create(workflow.Functional, "", who, now); err == nil {
+		t.Error("creating an existing artifact must fail")
+	}
+	st, err := l.Load(sddtest.Feature)
+	if err != nil || st.Phase != workflow.FunctionalDrafting {
+		t.Fatalf("state = %+v, %v", st, err)
+	}
+
+	// A customized project template wins over the built-in one.
+	if err := os.WriteFile(filepath.Join(l.TemplatesDir(), "functional.md"), []byte("---\nid: {{feature}}\n---\n# Custom {{title}}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	g, _ := Open(l, config.Default(), "other")
+	path, err = g.Create(workflow.Functional, "Other Thing", who, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(path); string(b) != "---\nid: other\n---\n# Custom Other Thing\n" {
+		t.Errorf("custom template not used:\n%s", b)
+	}
+}
+
+func TestApproveChainAndStaleness(t *testing.T) {
+	l := setup(t)
+	write(t, l, workflow.Functional, sddtest.Functional)
+	write(t, l, workflow.Technical, sddtest.Technical)
+
+	f := load(t, l)
+	if _, err := f.Approve(workflow.Technical, who, now); err == nil || !strings.Contains(err.Error(), "approve it first") {
+		t.Fatalf("technical before functional approval: %v", err)
+	}
+
+	f = approve(t, l, workflow.Functional)
+	if f.Phase != workflow.TechnicalDrafting {
+		t.Errorf("phase = %s", f.Phase)
+	}
+	appr := f.State.Approvals[workflow.Functional]
+	if appr.By != "Ada <ada@example.com>" || !appr.At.Equal(now) || len(appr.IDs) != 6 {
+		t.Errorf("approval = %+v", appr)
+	}
+	if _, err := load(t, l).Approve(workflow.Functional, who, now); !errors.Is(err, ErrAlreadyApproved) {
+		t.Errorf("second approval: %v", err)
+	}
+
+	f = approve(t, l, workflow.Technical)
+	if f.Technical.FunctionalHash != f.Files[workflow.Functional].Hash {
+		t.Errorf("functional_hash not stamped: %q", f.Technical.FunctionalHash)
+	}
+	f, err := Open(l, config.Default(), sddtest.Feature)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Create(workflow.Plan, "", who, now); err != nil {
+		t.Fatal(err)
+	}
+	write(t, l, workflow.Plan, sddtest.Plan)
+	f = approve(t, l, workflow.Plan)
+	if f.Phase != workflow.PlanApproved {
+		t.Errorf("phase = %s", f.Phase)
+	}
+	if f.Plan.FunctionalHash == "" || f.Plan.TechnicalHash != f.Files[workflow.Technical].Hash {
+		t.Errorf("plan hashes not stamped: %+v", f.Plan)
+	}
+	if ds := f.Sync(); len(ds) != 0 {
+		t.Errorf("approved feature should be in sync:\n%v", ds)
+	}
+
+	// Editing the approved functional spec makes everything downstream stale.
+	write(t, l, workflow.Functional, strings.Replace(sddtest.Functional, "p95 < 300 ms", "p95 < 250 ms", 1))
+	f = load(t, l)
+	want := map[workflow.Artifact]workflow.ArtifactStatus{
+		workflow.Functional: workflow.StatusModified, workflow.Technical: workflow.StatusStale, workflow.Plan: workflow.StatusStale,
+	}
+	for a, st := range want {
+		if f.Statuses[a] != st {
+			t.Errorf("%s = %s, want %s", a, f.Statuses[a], st)
+		}
+	}
+	if f.Phase != workflow.FunctionalDrafting {
+		t.Errorf("phase = %s", f.Phase)
+	}
+	if !f.Sync().HasErrors() {
+		t.Error("sync must fail on modified and stale artifacts")
+	}
+	if !strings.Contains(f.Next(), "sdd spec approve user-signup --functional") {
+		t.Errorf("next = %q", f.Next())
+	}
+
+	// Re-approving the functional spec leaves the technical spec stale until it is re-approved.
+	f = approve(t, l, workflow.Functional)
+	if f.Phase != workflow.TechnicalDrafting || f.Statuses[workflow.Technical] != workflow.StatusStale {
+		t.Errorf("phase = %s, technical = %s", f.Phase, f.Statuses[workflow.Technical])
+	}
+	f = approve(t, l, workflow.Technical)
+	if f.Statuses[workflow.Plan] != workflow.StatusStale || f.Phase != workflow.PlanDrafting {
+		t.Errorf("plan = %s, phase = %s", f.Statuses[workflow.Plan], f.Phase)
+	}
+
+	events, err := journal.Read(l.JournalFile(sddtest.Feature))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if open := journal.Interrupted(events); len(open) != 0 {
+		t.Errorf("every started action must be closed: %+v", open)
+	}
+	last := events[len(events)-1]
+	if last.Action != "spec.approve" || last.Status != journal.Completed || last.Actor != "user:ada@example.com" || last.Hashes["functional"] == "" {
+		t.Errorf("last event = %+v", last)
+	}
+	if b, err := os.ReadFile(l.LogFile(sddtest.Feature)); err != nil || !strings.Contains(string(b), "spec.approve") {
+		t.Errorf("log.md not rendered: %v", err)
+	}
+}
+
+func TestApproveBlockedByLint(t *testing.T) {
+	l := setup(t)
+	write(t, l, workflow.Functional, strings.Replace(sddtest.Functional, "<!-- Must be empty before approval. -->", "- Captcha?", 1))
+	f := load(t, l)
+	ds, err := f.Approve(workflow.Functional, who, now)
+	if !errors.Is(err, ErrBlocked) || !ds.HasErrors() {
+		t.Fatalf("err = %v, diags = %v", err, ds)
+	}
+	if f.Statuses[workflow.Functional] != workflow.StatusDraft {
+		t.Errorf("status = %s", f.Statuses[workflow.Functional])
+	}
+	events, _ := journal.Read(l.JournalFile(sddtest.Feature))
+	if n := len(events); n != 2 || events[1].Status != journal.Failed || events[1].Ref != events[0].Seq {
+		t.Errorf("events = %+v", events)
+	}
+}
+
+func TestDeletedIDBlocksReapproval(t *testing.T) {
+	l := setup(t)
+	write(t, l, workflow.Functional, sddtest.Functional)
+	approve(t, l, workflow.Functional)
+	write(t, l, workflow.Functional, strings.Replace(sddtest.Functional,
+		"- **AC-003:** Given a new account, when it is created, then a confirmation email is sent.",
+		"- **AC-004:** Given a new account, when it is created, then a confirmation email is sent.", 1))
+	ds, err := load(t, l).Approve(workflow.Functional, who, now)
+	if !errors.Is(err, ErrBlocked) {
+		t.Fatalf("err = %v", err)
+	}
+	found := false
+	for _, d := range ds {
+		found = found || strings.Contains(d.Message, "AC-003 was approved before and is now gone")
+	}
+	if !found {
+		t.Errorf("renumbering must be reported:\n%v", ds)
+	}
+}
+
+func TestList(t *testing.T) {
+	l := setup(t)
+	for _, d := range []string{l.SpecDir("b"), l.FeatureDir("a"), l.SpecDir("a"), filepath.Join(l.SpecsDir(), ".hidden")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names, err := List(l)
+	if err != nil || strings.Join(names, ",") != "a,b" {
+		t.Errorf("List = %v, %v", names, err)
+	}
+}

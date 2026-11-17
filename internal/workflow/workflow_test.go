@@ -91,3 +91,48 @@ func TestEvaluate(t *testing.T) {
 		})
 	}
 }
+
+func TestHashNormalizesLineEndings(t *testing.T) {
+	if Hash([]byte("a\r\nb\r\n")) != Hash([]byte("a\nb\n")) {
+		t.Error("CRLF and LF content must hash the same")
+	}
+	if Hash([]byte("a")) == Hash([]byte("b")) {
+		t.Error("different content must hash differently")
+	}
+}
+
+func TestEffective(t *testing.T) {
+	const (
+		ap = StatusApproved
+		dr = StatusDraft
+		mi = StatusMissing
+		mo = StatusModified
+		st = StatusStale
+	)
+	tests := []struct {
+		name    string
+		stored  Phase
+		f, t, p ArtifactStatus
+		want    Phase
+	}{
+		{"new feature", FunctionalDrafting, mi, mi, mi, FunctionalDrafting},
+		{"functional draft", FunctionalDrafting, dr, mi, mi, FunctionalDrafting},
+		{"functional approved", FunctionalDrafting, ap, mi, mi, FunctionalApproved},
+		{"technical created", FunctionalApproved, ap, dr, mi, TechnicalDrafting},
+		{"technical stale", PlanApproved, ap, st, st, TechnicalDrafting},
+		{"technical approved", TechnicalDrafting, ap, ap, mi, TechnicalApproved},
+		{"plan drafted", TechnicalApproved, ap, ap, dr, PlanDrafting},
+		{"plan approved", PlanDrafting, ap, ap, ap, PlanApproved},
+		{"implementing kept", Implementing, ap, ap, ap, Implementing},
+		{"edit reopens functional", Implementing, mo, st, st, FunctionalDrafting},
+		{"edited plan reopens plan", Implemented, ap, ap, mo, PlanDrafting},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Effective(tt.stored, map[Artifact]ArtifactStatus{Functional: tt.f, Technical: tt.t, Plan: tt.p})
+			if got != tt.want {
+				t.Errorf("Effective = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}

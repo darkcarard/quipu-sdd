@@ -9,7 +9,7 @@
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M0 (scaffold)**. Only `sdd init` and `sdd version` work so far. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M1 (specs, plans and state)**. Specs and plans are written by hand and can be linted, approved, synced and traced; the agent phases arrive from M2 onwards. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 
@@ -35,6 +35,21 @@ specs/<feature>/             # functional.md, technical.md, plan.md
 .sdd/templates/, profiles/   # customizable templates and language profiles
 .sdd/features/<feature>/     # state.json, journal.jsonl, log.md, report.md
 ```
+
+## Workflow so far (M1)
+
+```sh
+sdd spec new user-signup                 # write specs/user-signup/functional.md
+sdd spec lint user-signup                # deterministic guardrails
+sdd spec approve user-signup --functional
+sdd spec new user-signup --technical     # write technical.md, then approve it with --technical
+sdd plan new user-signup                 # write plan.md, then: sdd plan approve user-signup
+sdd status [user-signup]                 # phase, artifact status and the next command
+sdd sync check                           # spec↔spec and spec↔plan consistency, stale approvals
+sdd trace AC-002                         # or: sdd trace --matrix user-signup
+```
+
+Editing an approved spec sends it back to drafting and marks every artifact derived from it as stale until it is re-approved.
 
 ## Documentation
 

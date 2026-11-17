@@ -21,14 +21,16 @@ The feature state is stored in `.sdd/features/<feature>/state.json`:
 | State | Meaning | Leaves via |
 |---|---|---|
 | `functional-drafting` | Functional spec being written with the agent | `sdd spec approve --functional` |
-| `functional-approved` | Functional spec frozen at a hash | `sdd spec chat --technical` |
+| `functional-approved` | Functional spec frozen at a hash | `sdd spec new --technical` (or `sdd spec chat --technical`) |
 | `technical-drafting` | Technical spec being written | `sdd spec approve --technical` |
-| `technical-approved` | Both specs frozen | `sdd plan` |
+| `technical-approved` | Both specs frozen | `sdd plan` (or `sdd plan new`) |
 | `plan-drafting` | Plan generated, awaiting review | `sdd plan approve` |
 | `plan-approved` | Plan frozen | `sdd implement` |
 | `implementing` | Groups being executed (see group states) | last group approved |
 | `implemented` | All groups committed and approved | `sdd validate` passes |
 | `validated` | Integration tests and sync checks pass | — |
+
+Up to `plan-approved`, the phase is **derived from the artifacts**: their existence, the approvals in `state.json` and the current content hashes (see the staleness rule below). Editing a file by hand or pulling a teammate's changes is therefore always reflected by `sdd status`, and an edited or stale artifact reopens its `*-drafting` phase. From `implementing` onwards, the phase stored in `state.json` is kept as long as every artifact is still approved. The stored phase is updated on the next command that writes state, such as an approval.
 
 **Group states:** `pending → in-progress → awaiting-review → approved`. A `sdd revise` request sends a group from `awaiting-review` back to `in-progress`.
 
@@ -39,13 +41,16 @@ Each approval stores the SHA-256 of the approved artifact. Each downstream artif
 - `technical.md` stores `functional_hash`.
 - `plan.md` stores `functional_hash` and `technical_hash`.
 
+These source hashes are **stamped automatically** into the frontmatter when the downstream artifact is created and again when it is approved, and the approval in `state.json` records them as well. Hashes normalize CRLF to LF, so a checkout with `core.autocrlf` does not look like an edit.
+
 If a source changes after approval, every artifact that depends on it becomes **stale**. The feature cannot move forward until the stale artifacts are reconciled and approved again. For example, editing an approved functional spec makes both the technical spec and the plan stale.
 
 ## Phase 1: Specify (user + agent, iterative)
 
 | Command | Purpose |
 |---|---|
-| `sdd spec new <feature>` | Create `specs/<feature>/functional.md` from the template |
+| `sdd spec new <feature> [--title "<title>"]` | Create `specs/<feature>/functional.md` from the template |
+| `sdd spec new <feature> --technical` | Create `technical.md` from the template to write it by hand. Only allowed after functional approval |
 | `sdd spec chat <feature> --functional` | Interactive drafting session with the agent |
 | `sdd spec lint [<feature>]` | Deterministic guardrail checks (see [SPEC_GUIDELINES.md](SPEC_GUIDELINES.md)) |
 | `sdd spec approve <feature> --functional` | Freeze the functional spec (lint must pass) |
@@ -67,7 +72,8 @@ Ordering is strict: functional first, then technical. The technical spec must ma
 | Command | Purpose |
 |---|---|
 | `sdd plan <feature>` | Agent generates `specs/<feature>/plan.md` from both approved specs |
-| `sdd plan approve <feature>` | Freeze the plan (validation must pass) |
+| `sdd plan new <feature>` | Create `plan.md` from the template to write it by hand |
+| `sdd plan approve <feature>` | Freeze the plan (validation and coverage must pass) |
 
 Plan rules:
 - **Groups (`G#`)** are ordered by layer, for example `domain → persistence → service → interface → integration`. Each group must be implementable and testable once the groups before it are done. Dependencies (`depends_on`) may only point to earlier groups.
@@ -121,8 +127,9 @@ The agent never moves to the next group while the code fails to build or unit te
 | `sdd trace <ID>` / `sdd trace --matrix <feature>` | Follow one ID through spec → plan → commits → tests, or print the full matrix |
 
 Sync levels, each applied as soon as its artifacts exist:
-- **spec ↔ spec:** `functional_hash` matches, and every FR, NFR and AC is mapped in the technical spec.
-- **spec ↔ plan:** both source hashes match, and every FR and AC is covered by a task.
+- **spec ↔ spec:** `functional_hash` matches, every FR, NFR and AC is mapped in the technical spec, every ID the technical spec references exists in the functional spec, and every `depends_on` feature exists.
+- **spec ↔ plan:** both source hashes match, every FR and AC is covered by a task, and every covered ID exists and is not retired.
+- **approvals:** an artifact edited after its approval (`modified`) or whose sources changed after its approval (`stale`) is an error until it is re-approved.
 - **plan ↔ code:** every approved group has exactly one commit with matching trailers, and every AC is referenced by at least one test (`covers: AC-###`).
 - **`--deep`:** an LLM-assisted semantic review (for example, "does the code actually satisfy AC-003?"). It only produces a report and never blocks a gate on its own.
 
@@ -131,7 +138,7 @@ Sync levels, each applied as soon as its artifacts exist:
 ```
 sdd init | version | status [<feature>] | upgrade
 sdd spec new|chat|lint|approve
-sdd plan <feature> | plan approve <feature>
+sdd plan <feature> | plan new <feature> | plan approve <feature>
 sdd implement | review | approve | revise | resume | clean <feature>
 sdd validate <feature>
 sdd sync check [<feature>] [--deep]

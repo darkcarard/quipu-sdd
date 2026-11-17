@@ -12,8 +12,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/darkcarard/sdd-framework/internal/config"
+	"github.com/darkcarard/sdd-framework/internal/feature"
 	"github.com/darkcarard/sdd-framework/internal/state"
 	"github.com/darkcarard/sdd-framework/internal/templates"
 	"github.com/darkcarard/sdd-framework/internal/version"
@@ -31,6 +33,11 @@ type App struct {
 	Dir    string // project root (the current directory by default)
 	Stdout io.Writer
 	Stderr io.Writer
+
+	// Identity returns who performs an action; nil reads git config user.name/email.
+	Identity func(ctx context.Context) (feature.Identity, error)
+	// Now returns the current time; nil uses time.Now.
+	Now func() time.Time
 }
 
 type command struct {
@@ -44,9 +51,9 @@ func (a *App) commands() []command {
 	return []command{
 		{name: "init", summary: "Install the SDD framework in the current project", run: (*App).runInit},
 		{name: "version", summary: "Print the sdd version", run: (*App).runVersion},
-		{name: "status", summary: "Show feature state and the next action", milestone: "M1"},
-		{name: "spec", summary: "Create, draft (chat), lint and approve specs", milestone: "M1/M3"},
-		{name: "plan", summary: "Generate and approve the implementation plan", milestone: "M4"},
+		{name: "status", summary: "Show feature state and the next action", run: (*App).runStatus},
+		{name: "spec", summary: "Create, lint and approve specs (agent chat in M3)", run: (*App).runSpec},
+		{name: "plan", summary: "Create and approve the implementation plan (agent generation in M4)", run: (*App).runPlan},
 		{name: "implement", summary: "Implement the next task group in an isolated worktree", milestone: "M5"},
 		{name: "review", summary: "Review the group awaiting approval", milestone: "M5"},
 		{name: "approve", summary: "Approve the reviewed group and continue", milestone: "M5"},
@@ -54,8 +61,8 @@ func (a *App) commands() []command {
 		{name: "resume", summary: "Resume an interrupted run", milestone: "M5"},
 		{name: "clean", summary: "Remove a feature worktree", milestone: "M5"},
 		{name: "validate", summary: "Run integration tests and sync checks, write the report", milestone: "M6"},
-		{name: "sync", summary: "Check consistency between specs, plan and code", milestone: "M1/M6"},
-		{name: "trace", summary: "Trace an ID across specs, plan, commits and tests", milestone: "M1/M6"},
+		{name: "sync", summary: "Check consistency between specs and plan (code in M6)", run: (*App).runSync},
+		{name: "trace", summary: "Trace an ID across specs and plan (commits and tests in M6)", run: (*App).runTrace},
 		{name: "upgrade", summary: "Migrate the project layout to this binary's version", milestone: "later"},
 	}
 }
@@ -85,6 +92,8 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			return ExitOK
 		case errors.Is(err, errUsage):
 			return ExitUsage
+		case errors.Is(err, errFailed):
+			return ExitError
 		default:
 			fmt.Fprintf(a.Stderr, "sdd %s: %v\n", c.name, err)
 			return ExitError

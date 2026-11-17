@@ -1,0 +1,135 @@
+package cli
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/darkcarard/sdd-framework/internal/feature"
+	"github.com/darkcarard/sdd-framework/internal/sddtest"
+)
+
+// runAs runs the CLI with a fixed identity and clock.
+func runAs(t *testing.T, dir string, args ...string) (int, string, string) {
+	t.Helper()
+	var out, errb bytes.Buffer
+	app := &App{
+		Dir: dir, Stdout: &out, Stderr: &errb,
+		Identity: func(context.Context) (feature.Identity, error) {
+			return feature.Identity{Name: "Ada", Email: "ada@example.com"}, nil
+		},
+		Now: func() time.Time { return time.Date(2026, 11, 17, 10, 0, 0, 0, time.UTC) },
+	}
+	code := app.Run(context.Background(), args)
+	return code, out.String(), errb.String()
+}
+
+func mustRun(t *testing.T, dir string, wantCode int, args ...string) string {
+	t.Helper()
+	code, out, errOut := runAs(t, dir, args...)
+	if code != wantCode {
+		t.Fatalf("sdd %s: exit %d, want %d\nstdout:\n%s\nstderr:\n%s", strings.Join(args, " "), code, wantCode, out, errOut)
+	}
+	return out + errOut
+}
+
+func writeSpec(t *testing.T, dir, name, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "specs", sddtest.Feature, name), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func contains(t *testing.T, out string, wants ...string) {
+	t.Helper()
+	for _, w := range wants {
+		if !strings.Contains(out, w) {
+			t.Errorf("output missing %q:\n%s", w, out)
+		}
+	}
+}
+
+// TestHandWrittenSpecWorkflow is the M1 exit criterion: a spec written by hand can
+// be linted, approved and traced, and editing it marks downstream artifacts stale.
+func TestHandWrittenSpecWorkflow(t *testing.T) {
+	dir := t.TempDir()
+	mustRun(t, dir, ExitOK, "init")
+	contains(t, mustRun(t, dir, ExitOK, "status"), "No features yet")
+
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", "Bad_Name"), "kebab-case")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "new", sddtest.Feature), "created  specs/user-signup/functional.md")
+	contains(t, mustRun(t, dir, ExitError, "spec", "lint"), "template placeholder <requirement title>")
+	contains(t, mustRun(t, dir, ExitError, "spec", "approve", sddtest.Feature, "--functional"), "not approved")
+
+	writeSpec(t, dir, "functional.md", sddtest.Functional)
+	contains(t, mustRun(t, dir, ExitOK, "spec", "lint", sddtest.Feature), "1 file checked: 0 errors, 0 warnings")
+	contains(t, mustRun(t, dir, ExitError, "spec", "new", sddtest.Feature, "--technical"), "approve it first")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--functional"),
+		"approved specs/user-signup/functional.md", "phase:   functional-approved", "sdd spec new user-signup --technical")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--functional"), "already approved")
+
+	mustRun(t, dir, ExitOK, "spec", "new", "--technical", sddtest.Feature)
+	writeSpec(t, dir, "technical.md", strings.Replace(sddtest.Technical, "| FR-002 | Mailer | |\n", "", 1))
+	contains(t, mustRun(t, dir, ExitError, "sync", "check", sddtest.Feature), "FR-002 is not mapped to any component")
+	contains(t, mustRun(t, dir, ExitError, "spec", "approve", sddtest.Feature, "--technical"), "FR-002 is not mapped")
+	writeSpec(t, dir, "technical.md", sddtest.Technical)
+	mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--technical")
+
+	mustRun(t, dir, ExitOK, "plan", "new", sddtest.Feature)
+	writeSpec(t, dir, "plan.md", sddtest.Plan)
+	contains(t, mustRun(t, dir, ExitOK, "plan", "approve", sddtest.Feature), "phase:   plan-approved", "sdd implement user-signup")
+	contains(t, mustRun(t, dir, ExitOK, "sync", "check"), "0 errors, 0 warnings")
+
+	contains(t, mustRun(t, dir, ExitOK, "trace", "AC-002"),
+		"AC-002  (user-signup · specs/user-signup/functional.md:", "technical: unit, integration", "plan:      T2.1")
+	contains(t, mustRun(t, dir, ExitOK, "trace", "user-signup/T3.1"), "covers:    FR-002, AC-003")
+	contains(t, mustRun(t, dir, ExitError, "trace", "FR-042"), "not defined in any feature")
+	contains(t, mustRun(t, dir, ExitError, "trace", "bogus"), "not a traceable ID")
+	contains(t, mustRun(t, dir, ExitOK, "trace", "--matrix", sddtest.Feature), "| FR-001 | — | Sign up with email | SignupService, HTTP handler | T1.1, T2.1 |")
+
+	// Editing the approved functional spec marks the technical spec and the plan stale.
+	writeSpec(t, dir, "functional.md", strings.Replace(sddtest.Functional, "p95 < 300 ms", "p95 < 250 ms", 1))
+	contains(t, mustRun(t, dir, ExitOK, "status"), "user-signup  functional-drafting  modified    stale      stale")
+	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature),
+		"Phase:   functional-drafting (state.json still says plan-approved", "technical.md   stale",
+		"Next: review your edits to specs/user-signup/functional.md, then run `sdd spec approve user-signup --functional`")
+	contains(t, mustRun(t, dir, ExitError, "sync", "check"), "plan.md is stale: functional.md changed after it was approved")
+
+	if _, err := os.Stat(filepath.Join(dir, ".sdd", "locks", sddtest.Feature+".lock")); !os.IsNotExist(err) {
+		t.Errorf("the feature lock must be released: %v", err)
+	}
+}
+
+func TestSubcommandUsage(t *testing.T) {
+	dir := t.TempDir()
+	mustRun(t, dir, ExitOK, "init")
+	for _, args := range [][]string{
+		{"spec"}, {"spec", "bogus"}, {"spec", "approve", "x"}, {"spec", "approve", "x", "--functional", "--technical"},
+		{"sync"}, {"trace"}, {"plan", "approve"}, {"status", "a", "b"},
+	} {
+		if code, _, _ := runAs(t, dir, args...); code != ExitUsage {
+			t.Errorf("sdd %s: exit %d, want usage error", strings.Join(args, " "), code)
+		}
+	}
+	contains(t, mustRun(t, dir, ExitError, "spec", "chat", "x"), "M3")
+	contains(t, mustRun(t, dir, ExitError, "sync", "check", "--deep"), "M6")
+	contains(t, mustRun(t, dir, ExitError, "status", "missing"), "feature not found")
+}
+
+func TestLintReportsInvalidFeatureDir(t *testing.T) {
+	dir := t.TempDir()
+	mustRun(t, dir, ExitOK, "init")
+	if err := os.MkdirAll(filepath.Join(dir, "specs", "Bad_Dir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	contains(t, mustRun(t, dir, ExitError, "spec", "lint"), "specs/Bad_Dir: error: invalid feature name")
+	contains(t, mustRun(t, dir, ExitOK, "status"), "Bad_Dir")
+}
+
+func TestCommandsNeedInit(t *testing.T) {
+	contains(t, mustRun(t, t.TempDir(), ExitError, "status"), "run `sdd init` first")
+}

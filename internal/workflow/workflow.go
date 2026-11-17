@@ -4,6 +4,7 @@
 package workflow
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -131,12 +132,18 @@ func Sources(a Artifact) []Artifact {
 	return nil
 }
 
+// Artifacts returns every artifact in dependency order.
+func Artifacts() []Artifact { return []Artifact{Functional, Technical, Plan} }
+
 // Approval records the exact content a user approved.
 type Approval struct {
 	Hash         string              `json:"hash"`
 	SourceHashes map[Artifact]string `json:"source_hashes,omitempty"`
 	By           string              `json:"by"`
 	At           time.Time           `json:"at"`
+	// IDs are the IDs defined by the approved content (including retired ones),
+	// so a later edit that deletes or renumbers an ID can be detected.
+	IDs []string `json:"ids,omitempty"`
 }
 
 // ArtifactStatus is the derived status of an artifact.
@@ -151,8 +158,10 @@ const (
 )
 
 // Hash returns the canonical content hash used for approvals ("sha256:<hex>").
+// CRLF line endings are normalized to LF first, so a checkout with
+// core.autocrlf on another machine does not make approved artifacts look edited.
 func Hash(content []byte) string {
-	sum := sha256.Sum256(content)
+	sum := sha256.Sum256(bytes.ReplaceAll(content, []byte("\r\n"), []byte("\n")))
 	return "sha256:" + hex.EncodeToString(sum[:])
 }
 
@@ -162,7 +171,7 @@ func Hash(content []byte) string {
 // re-approved regardless of its sources.
 func Evaluate(approvals map[Artifact]Approval, current map[Artifact]string) map[Artifact]ArtifactStatus {
 	out := map[Artifact]ArtifactStatus{}
-	for _, a := range []Artifact{Functional, Technical, Plan} {
+	for _, a := range Artifacts() {
 		cur := current[a]
 		appr, approved := approvals[a]
 		switch {
@@ -183,4 +192,31 @@ func Evaluate(approvals map[Artifact]Approval, current map[Artifact]string) map[
 		}
 	}
 	return out
+}
+
+// Effective returns the phase a feature is really in, given its stored phase and
+// the derived artifact statuses. Up to plan-approved the phase follows from the
+// artifacts alone, so hand edits and pulls from other machines are always
+// reflected; an edited or stale artifact reopens its drafting phase. From
+// implementing onwards the stored phase is kept while the artifacts are approved.
+func Effective(stored Phase, st map[Artifact]ArtifactStatus) Phase {
+	var derived Phase
+	switch {
+	case st[Functional] != StatusApproved:
+		derived = FunctionalDrafting
+	case st[Technical] == StatusMissing:
+		derived = FunctionalApproved
+	case st[Technical] != StatusApproved:
+		derived = TechnicalDrafting
+	case st[Plan] == StatusMissing:
+		derived = TechnicalApproved
+	case st[Plan] != StatusApproved:
+		derived = PlanDrafting
+	default:
+		derived = PlanApproved
+	}
+	if derived == PlanApproved && stored.index() > PlanApproved.index() {
+		return stored
+	}
+	return derived
 }
