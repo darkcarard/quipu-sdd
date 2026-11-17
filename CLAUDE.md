@@ -9,6 +9,7 @@ Context for Claude Code sessions on this repository, on any machine.
 - `docs/SPEC_GUIDELINES.md`: spec guardrails, ID conventions (`FR`/`NFR`/`AC`/`ADR`/`G`/`T`) and the plan format
 - `docs/TRACEABILITY.md`: audit journal, ID chain, checkpoints and `sdd resume`
 - `docs/ROADMAP.md`: milestones and exit criteria
+- `docs/E2E_TEST.md`: manual end-to-end test in a real Claude Code session
 
 ## Current status
 - **M0 (scaffold): done.** `sdd init` and `sdd version`.
@@ -20,7 +21,7 @@ Context for Claude Code sessions on this repository, on any machine.
 - **M6 (Validate): done.** `internal/validate`: `CheckCode` (one commit per group with matching trailers on `sdd/<feature>`, commits without trailers, `covers:` references found with `git grep`, every AC of an approved group tested), `Index` (trace with commits and tests), `Validate` (integration in the worktree, all sync checks, `report.md`, phase `validated`), `ReviewContext`. CLI `validate`, `review --context`; `sync check` and `trace` include code; MCP `review_context`; `/sdd-deep-review`.
 - **Token economy of agent-facing output: done.** Profile sent once per group (and on resume), one-line rules in `task_next`, `limits.output_tail` (6000 chars) for failing command output, guides omit the template once the file exists, shorter MCP tool descriptions. Measured: later `task_next` ~700→~230 tokens, tool catalog ~1590→~1160, worst failure output ~4000→~1500.
 - **M7 (Brownfield adoption): done.** `internal/adopt` (deterministic, compact inventory: languages, build files, suggested commands, layout, tests, docs), baseline features (`origin: existing` in functional frontmatter and state; `workflow.EffectiveFor` → `baselined`; no plan: `feature.ErrBaselinePlan`), `sdd adopt --context` / MCP `adopt_context`, `spec new --baseline` / `spec_new baseline`, `guide adopt`, `/sdd-adopt`; trace shows baselines as existing code and links tests that reference them; sync warns about unapproved dependencies.
-- **Next: M8.** Integration files for Codex CLI and Gemini CLI. Also pending: the end-to-end test in a real Claude Code session.
+- **Next: M8.** Integration files for Codex CLI and Gemini CLI. Also pending: the end-to-end test in a real Claude Code session (`docs/E2E_TEST.md`).
 
 Update this section whenever a milestone is completed.
 
