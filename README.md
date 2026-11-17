@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/quipu-mark.svg" width="112" alt="Quipu logo"></p>
+
 # Quipu
 
 **Spec-Driven Development for coding agents.**
