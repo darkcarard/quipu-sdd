@@ -338,28 +338,31 @@ func (f *Feature) Next() string {
 	case workflow.PlanDrafting:
 		return edit(workflow.Plan)
 	case workflow.PlanApproved:
-		return fmt.Sprintf("start implementing with `sdd implement %s` (creates the worktree and branch sdd/%s), then `/sdd-implement %s` in Claude Code", n, n, n)
+		return fmt.Sprintf("start implementing with `sdd implement %s` (creates the worktree and branch sdd/%s), then type `/sdd-implement %s` in Claude Code", n, n, n)
 	case workflow.Implementing:
 		for _, g := range f.State.Groups {
 			switch g.Status {
 			case workflow.GroupApproved:
 				continue
 			case workflow.GroupAwaitingReview:
-				return fmt.Sprintf("review %s with `sdd review %s`, then `sdd approve %s` or `sdd revise %s -m \"<what to change>\"`", g.ID, n, n, n)
+				return fmt.Sprintf("review %s with `sdd review %s`, then `sdd approve %s` or `sdd revise %s -m \"<what to change>\"`", g.ID, g.ID, g.ID, g.ID)
 			case workflow.GroupFailed:
-				return fmt.Sprintf("%s failed verification: inspect .sdd/worktrees/%s, then give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, n, n)
+				return fmt.Sprintf("%s failed verification: inspect .sdd/worktrees/%s, then give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, n, g.ID)
 			case workflow.GroupInProgress:
-				return fmt.Sprintf("continue %s with your agent (`/sdd-implement %s` in Claude Code)", g.ID, n)
+				return fmt.Sprintf("continue %s with your agent (type `/sdd-implement %s` in Claude Code)", g.ID, n)
 			}
-			return fmt.Sprintf("start %s with your agent (`/sdd-implement %s` in Claude Code)", g.ID, n)
+			return fmt.Sprintf("start %s with your agent (type `/sdd-implement %s` in Claude Code)", g.ID, n)
 		}
-		return fmt.Sprintf("continue with your agent (`/sdd-implement %s` in Claude Code)", n)
+		return fmt.Sprintf("continue with your agent (type `/sdd-implement %s` in Claude Code)", n)
 	case workflow.Implemented:
 		return fmt.Sprintf("run `sdd validate %s` (integration tests and every consistency check; writes report.md)", n)
 	case workflow.Baselined:
 		return fmt.Sprintf("nothing: the baseline is approved. New features that build on this code declare `depends_on: [%s]`; if one changes adopted behavior, revise this baseline's specs and re-approve them", n)
 	case workflow.Validated:
-		return fmt.Sprintf("merge branch sdd/%s into your branch (merge, PR or rebase), then remove the worktree with `sdd clean %s`", n, n)
+		if m := f.State.Merged; m != nil {
+			return fmt.Sprintf("nothing: sdd/%s was merged into %s; delete the branch with `git branch -d sdd/%s` once you no longer need it", n, m.Into, n)
+		}
+		return fmt.Sprintf("merge it with `sdd merge %s` (into the branch checked out in the project, from any directory; removes the worktree), or merge sdd/%s your own way (PR, rebase) and run `sdd clean %s`", n, n, n)
 	}
 	return ""
 }

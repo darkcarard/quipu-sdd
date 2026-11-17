@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,18 +70,19 @@ func TestImplementWorkflowCLI(t *testing.T) {
 	contains(t, mustRun(t, dir, ExitOK, "task", "done", sddtest.Feature, "--summary", "User entity"), "T1.1 done (checkpoint")
 	contains(t, mustRun(t, dir, ExitOK, "task", "next", sddtest.Feature), "every task of this group is done: call group_verify")
 	contains(t, mustRun(t, dir, ExitOK, "group", "verify", sddtest.Feature),
-		"G1 verified and committed", "feat(user-signup): G1 Domain model", "sdd review user-signup")
+		"G1 verified and committed", "feat(user-signup): G1 Domain model", "sdd review G1")
 
 	out := mustRun(t, dir, ExitOK, "status", sddtest.Feature)
 	contains(t, out, "Implementation (worktree .sdd/worktrees/user-signup, branch sdd/user-signup):",
-		"G1   awaiting-review  1/1 tasks  Domain model", "Next: review G1 with `sdd review user-signup`")
-	contains(t, mustRun(t, dir, ExitOK, "review", sddtest.Feature, "--diff"),
+		"G1   awaiting-review  1/1 tasks  Domain model", "Next: review G1 with `sdd review G1`")
+	contains(t, mustRun(t, dir, ExitOK, "review", "g1", "--diff"),
 		"Group G1: Domain model  [awaiting-review]", "agent: User entity", "internal/signup/user.go", "test:       passed")
-	contains(t, mustRun(t, dir, ExitError, "revise", sddtest.Feature), "feedback is required")
-	contains(t, mustRun(t, dir, ExitOK, "revise", sddtest.Feature, "-m", "Add a doc comment"), "G1 is back in progress")
+	contains(t, mustRun(t, dir, ExitError, "approve", "G2"), "no feature being implemented has G2 as its current group")
+	contains(t, mustRun(t, dir, ExitError, "revise", "G1"), "feedback is required")
+	contains(t, mustRun(t, dir, ExitOK, "revise", "G1", "-m", "Add a doc comment"), "G1 is back in progress", "type `/sdd-implement user-signup` in Claude Code")
 	contains(t, mustRun(t, dir, ExitOK, "task", "next", sddtest.Feature), "The user asked for changes:", "Add a doc comment")
 	mustRun(t, dir, ExitOK, "group", "verify", sddtest.Feature)
-	contains(t, mustRun(t, dir, ExitOK, "approve", sddtest.Feature), "approved G1", "start G2")
+	contains(t, mustRun(t, dir, ExitOK, "approve"), "approved G1", "start G2")
 
 	// Phase 4 checks already apply to approved groups.
 	contains(t, mustRun(t, dir, ExitError, "sync", "check", sddtest.Feature), "AC-001 is not referenced by any test")
@@ -103,4 +105,64 @@ func TestImplementWorkflowCLI(t *testing.T) {
 
 	// Commands also work from inside the worktree.
 	contains(t, mustRun(t, filepath.Join(wt, "internal"), ExitOK, "status"), "user-signup  User Signup  implementing")
+}
+
+// TestApprovalCommitsAndMerge follows a feature from approval to merge: every
+// approval commits the specs and records, the review commands take group IDs,
+// and `sdd merge` merges into the project's branch even when run from inside
+// the worktree.
+func TestApprovalCommitsAndMerge(t *testing.T) {
+	dir := gitProject(t)
+	ctx := context.Background()
+	g := workspace.Git{Dir: dir}
+	git := func(args ...string) string {
+		t.Helper()
+		out, err := g.Run(ctx, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	contains(t, git("log", "--format=%s", "main"), "sdd(user-signup): approve the functional spec",
+		"sdd(user-signup): approve the technical spec", "sdd(user-signup): approve the plan")
+	contains(t, git("show", "--name-only", "--format=%B", ":/approve the plan"), "SDD-Feature: user-signup",
+		"specs/user-signup/plan.md", ".sdd/features/user-signup/state.json")
+
+	wt := filepath.Join(dir, ".sdd", "worktrees", sddtest.Feature)
+	files := map[string]map[string]string{
+		"T1.1": {"internal/signup/user.go": "package signup\n", "internal/signup/user_test.go": "package signup\n// covers: AC-001\n"},
+		"T2.1": {"internal/signup/service.go": "package signup\n", "internal/signup/service_test.go": "package signup\n// covers: AC-002, NFR-001\n"},
+		"T3.1": {"internal/mail/mail.go": "package mail\n", "internal/mail/mail_test.go": "package mail\n// covers: AC-003\n"},
+	}
+	contains(t, mustRun(t, dir, ExitError, "merge"), "no validated feature is waiting to be merged")
+	mustRun(t, dir, ExitOK, "implement", sddtest.Feature)
+	for i, task := range []string{"T1.1", "T2.1", "T3.1"} {
+		id := fmt.Sprintf("G%d", i+1)
+		contains(t, mustRun(t, dir, ExitOK, "task", "next", sddtest.Feature), "Task "+task)
+		for rel, content := range files[task] {
+			os.MkdirAll(filepath.Dir(filepath.Join(wt, rel)), 0o755)
+			os.WriteFile(filepath.Join(wt, rel), []byte(content), 0o644)
+		}
+		mustRun(t, dir, ExitOK, "task", "done", sddtest.Feature)
+		contains(t, mustRun(t, dir, ExitOK, "group", "verify", sddtest.Feature), "sdd review "+id)
+		contains(t, mustRun(t, wt, ExitOK, "review", id), "Group "+id, "`sdd approve "+id+"`")
+		contains(t, mustRun(t, wt, ExitOK, "approve", id), "approved "+id)
+	}
+	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "only a validated feature can be merged")
+	contains(t, mustRun(t, dir, ExitOK, "validate", sddtest.Feature), "validation PASSED", "`sdd merge user-signup`")
+
+	// From inside the worktree, as an agent's shared shell would be.
+	out := mustRun(t, filepath.Join(wt, "internal"), ExitOK, "merge")
+	contains(t, out, "merged sdd/user-signup into main (fast-forward", "removed the worktree",
+		"committed the specs and records", "Next: nothing: sdd/user-signup was merged into main")
+	if _, err := os.Stat(wt); !os.IsNotExist(err) {
+		t.Errorf("the worktree must be removed: %v", err)
+	}
+	contains(t, git("log", "--format=%s", "main"), "sdd(user-signup): records of the merge into main",
+		"feat(user-signup): G3 Confirmation mail")
+	if st := git("status", "--porcelain", "--", "specs", ".sdd"); st != "" {
+		t.Errorf("records left uncommitted:\n%s", st)
+	}
+	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "already merged into main")
+	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature), "git branch -d sdd/user-signup")
 }

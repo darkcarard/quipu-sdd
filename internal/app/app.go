@@ -452,6 +452,8 @@ type Approved struct {
 	Next            string
 	AlreadyApproved bool
 	Diagnostics     Report
+	Commit          string // the commit of the feature's specs and records, if one was made
+	CommitNote      string // why they were not committed
 }
 
 // ErrBlocked is returned (with the diagnostics) when lint or sync errors block an approval.
@@ -484,6 +486,11 @@ func (a *App) Approve(ctx context.Context, arg string, art workflow.Artifact) (A
 		}
 		appr := f.State.Approvals[art]
 		out.Hash, out.By, out.Phase, out.Next = appr.Hash, appr.By, string(f.Phase), f.Next()
+		what := "the " + string(art) + " spec"
+		if art == workflow.Plan {
+			what = "the plan"
+		}
+		out.Commit, out.CommitNote = a.commitRecords(ctx, name, fmt.Sprintf("sdd(%s): approve %s", name, what))
 		return nil
 	})
 	return out, err

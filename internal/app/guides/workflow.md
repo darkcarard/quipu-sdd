@@ -6,7 +6,7 @@ How to work:
 - Use the `sdd` MCP tools (`status`, `guide`, `spec_new`, `plan_new`, `lint`, `sync_check`, `trace`, and for implementation `task_next`, `task_done`, `group_verify`). If they are not available, run the equivalent `sdd` commands in the shell (`sdd status`, `sdd guide <topic>`, `sdd spec new`, `sdd spec lint`, `sdd sync check`, `sdd trace`, `sdd task next|done`, `sdd group verify`).
 - Before drafting an artifact, call `guide` for its topic and follow it.
 - After every edit to a spec or the plan, run `lint` and fix the errors before handing back to the user.
-- Approvals belong to the user. Never run `sdd spec approve`, `sdd plan approve`, `sdd approve`, `sdd revise`, `sdd resume` or `sdd clean`; when something is ready, ask the user to run the command that `status` reports as next.
+- Approvals belong to the user. Never run `sdd spec approve`, `sdd plan approve`, `sdd approve`, `sdd revise`, `sdd resume`, `sdd clean` or `sdd merge`; when something is ready, ask the user to run the command that `status` reports as next.
 - While implementing, work only in the feature's worktree and never commit: sdd verifies and commits, and stops after each group for the user's review.
 - Editing an approved spec reopens it and makes everything derived from it stale. Do it only when the user asks, and say so.
 - Do not edit `sdd.yaml` or anything under `.sdd/` (state, journal, templates) unless the user asks.

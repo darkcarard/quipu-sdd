@@ -27,7 +27,10 @@ func ReviewGroup(ctx context.Context, s *Session, withDiff bool) (Review, error)
 	if f.Phase != workflow.Implementing {
 		return Review{}, s.phaseError()
 	}
-	g := s.active()
+	g, err := s.target()
+	if err != nil {
+		return Review{}, err
+	}
 	if g == nil {
 		return Review{}, errors.New("every group is approved: nothing to review")
 	}
@@ -49,9 +52,9 @@ func ReviewGroup(ctx context.Context, s *Session, withDiff bool) (Review, error)
 	}
 	switch g.Status {
 	case workflow.GroupAwaitingReview:
-		out.Next = fmt.Sprintf("`sdd approve %s` to accept %s, or `sdd revise %s -m \"<what to change>\"`", f.Name, g.ID, f.Name)
+		out.Next = fmt.Sprintf("`sdd approve %s` to accept it, or `sdd revise %s -m \"<what to change>\"`", g.ID, g.ID)
 	case workflow.GroupFailed:
-		out.Next = fmt.Sprintf("%s failed verification: give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, f.Name)
+		out.Next = fmt.Sprintf("%s failed verification: give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, g.ID)
 	default:
 		out.Next = fmt.Sprintf("%s is still in progress; it can be reviewed once the agent has verified it", g.ID)
 	}
@@ -81,7 +84,10 @@ func ApproveGroup(ctx context.Context, s *Session) (Approved, error) {
 	if f.Phase != workflow.Implementing {
 		return Approved{}, s.phaseError()
 	}
-	g := s.active()
+	g, err := s.target()
+	if err != nil {
+		return Approved{}, err
+	}
 	if g == nil || g.Status != workflow.GroupAwaitingReview {
 		return Approved{}, errors.New("no group is awaiting review")
 	}
@@ -116,7 +122,10 @@ func ReviseGroup(ctx context.Context, s *Session, feedback string) (GroupView, e
 	if f.Phase != workflow.Implementing {
 		return GroupView{}, s.phaseError()
 	}
-	g := s.active()
+	g, err := s.target()
+	if err != nil {
+		return GroupView{}, err
+	}
 	if g == nil || (g.Status != workflow.GroupAwaitingReview && g.Status != workflow.GroupFailed) {
 		return GroupView{}, errors.New("no group is awaiting review or failed")
 	}

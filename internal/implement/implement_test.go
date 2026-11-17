@@ -222,7 +222,7 @@ func TestImplementationCycle(t *testing.T) {
 	}
 
 	// The agent must stop for the review and cannot approve.
-	if n := p.next(); n.Kind != NextStop || !strings.Contains(n.Message, "sdd review user-signup") {
+	if n := p.next(); n.Kind != NextStop || !strings.Contains(n.Message, "sdd review G1") {
 		t.Errorf("next during review = %+v", n)
 	}
 	if _, err := ApproveGroup(ctx, p.session(agent)); !errors.Is(err, ErrHumanOnly) {
@@ -231,8 +231,22 @@ func TestImplementationCycle(t *testing.T) {
 	if _, err := ReviseGroup(ctx, p.session(agent), "x"); !errors.Is(err, ErrHumanOnly) {
 		t.Errorf("agent revise: %v", err)
 	}
-	if !strings.Contains(p.load().Next(), "sdd review user-signup") {
+	if _, err := Merge(ctx, p.session(agent)); !errors.Is(err, ErrHumanOnly) {
+		t.Errorf("agent merge: %v", err)
+	}
+	if !strings.Contains(p.load().Next(), "`sdd review G1`, then `sdd approve G1`") {
 		t.Errorf("status next = %s", p.load().Next())
+	}
+
+	// A named group must be the one under review.
+	wrong := p.session(user)
+	wrong.Group = "G2"
+	if _, err := ApproveGroup(ctx, wrong); err == nil || !strings.Contains(err.Error(), "G2 is pending; the current group is G1 (awaiting-review)") {
+		t.Errorf("approve of the wrong group: %v", err)
+	}
+	wrong.Group = "G9"
+	if _, err := ReviewGroup(ctx, wrong, false); err == nil || !strings.Contains(err.Error(), "has no group G9") {
+		t.Errorf("review of an unknown group: %v", err)
 	}
 
 	r, err := ReviewGroup(ctx, p.session(user), true)

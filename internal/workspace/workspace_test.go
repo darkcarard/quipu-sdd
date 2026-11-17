@@ -142,3 +142,100 @@ func TestEnsureErrors(t *testing.T) {
 		t.Errorf("no repo: %v", err)
 	}
 }
+
+func TestCommitPaths(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	g := Git{Dir: dir}
+	if _, err := g.CommitPaths(ctx, "x", "specs"); !errors.Is(err, ErrNotRepo) {
+		t.Fatalf("outside a repository: %v", err)
+	}
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"config", "user.name", "Test"},
+		{"config", "user.email", "t@example.com"}, {"config", "commit.gpgsign", "false"}} {
+		if _, err := g.Run(ctx, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put := func(rel, content string) {
+		os.MkdirAll(filepath.Dir(filepath.Join(dir, rel)), 0o755)
+		os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644)
+	}
+	// The first commit of a repository; a file the user staged stays staged and out of it.
+	put("specs/a/functional.md", "v1\n")
+	put("other.go", "package other\n")
+	if _, err := g.Run(ctx, "add", "other.go"); err != nil {
+		t.Fatal(err)
+	}
+	sha, err := g.CommitPaths(ctx, "approve", "specs/a", ".sdd/features/a")
+	if err != nil || sha == "" {
+		t.Fatalf("CommitPaths: %q %v", sha, err)
+	}
+	if files, _ := g.Run(ctx, "show", "--name-only", "--format=", "HEAD"); files != "specs/a/functional.md" {
+		t.Errorf("committed files = %q", files)
+	}
+	if staged, _ := g.Run(ctx, "diff", "--cached", "--name-only"); staged != "other.go" {
+		t.Errorf("staged after commit = %q", staged)
+	}
+	// Nothing changed: no commit.
+	if sha, err := g.CommitPaths(ctx, "again", "specs/a"); err != nil || sha != "" {
+		t.Errorf("no changes: %q %v", sha, err)
+	}
+	// Deletions are committed too.
+	put(".sdd/features/a/state.json", "{}\n")
+	os.Remove(filepath.Join(dir, "specs/a/functional.md"))
+	if sha, err := g.CommitPaths(ctx, "records", "specs/a", ".sdd/features/a"); err != nil || sha == "" {
+		t.Fatalf("second commit: %q %v", sha, err)
+	}
+	if files, _ := g.Run(ctx, "show", "--name-status", "--format=", "HEAD"); !strings.Contains(files, "A\t.sdd/features/a/state.json") ||
+		!strings.Contains(files, "D\tspecs/a/functional.md") || strings.Contains(files, "other.go") {
+		t.Errorf("second commit files = %q", files)
+	}
+}
+
+func TestMergeBranch(t *testing.T) {
+	ctx := context.Background()
+	root := repo(t)
+	g := Git{Dir: root}
+	dir := filepath.Join(root, ".sdd", "worktrees", "signup")
+	wt, _, err := Ensure(ctx, root, dir, "signup")
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(dir, "a.go"), []byte("package a\n"), 0o644)
+	if _, err := wt.Checkpoint(ctx, "a"); err != nil {
+		t.Fatal(err)
+	}
+	if b, err := g.CurrentBranch(ctx); err != nil || b != "main" {
+		t.Fatalf("CurrentBranch = %q %v", b, err)
+	}
+	ff, err := g.Merge(ctx, "sdd/signup", "merge")
+	if err != nil || !ff {
+		t.Fatalf("fast-forward: %v %v", ff, err)
+	}
+
+	// Diverged: a merge commit.
+	os.WriteFile(filepath.Join(dir, "b.go"), []byte("package b\n"), 0o644)
+	wt.Checkpoint(ctx, "b")
+	os.WriteFile(filepath.Join(root, "c.go"), []byte("package c\n"), 0o644)
+	g.Run(ctx, "add", "c.go")
+	g.Run(ctx, "commit", "-q", "-m", "c")
+	if ff, err := g.Merge(ctx, "sdd/signup", "Merge sdd/signup"); err != nil || ff {
+		t.Fatalf("merge commit: %v %v", ff, err)
+	}
+	if subj, _ := g.Run(ctx, "log", "-1", "--format=%s"); subj != "Merge sdd/signup" {
+		t.Errorf("merge subject = %q", subj)
+	}
+
+	// A conflict is aborted and leaves the checkout clean.
+	os.WriteFile(filepath.Join(dir, "d.go"), []byte("package d // branch\n"), 0o644)
+	wt.Checkpoint(ctx, "d")
+	os.WriteFile(filepath.Join(root, "d.go"), []byte("package d // main\n"), 0o644)
+	g.Run(ctx, "add", "d.go")
+	g.Run(ctx, "commit", "-q", "-m", "d")
+	if _, err := g.Merge(ctx, "sdd/signup", "m"); err == nil {
+		t.Fatal("a conflicting merge must fail")
+	}
+	if st, _ := g.Run(ctx, "status", "--porcelain", "--untracked-files=no"); st != "" {
+		t.Errorf("checkout after aborted merge: %q", st)
+	}
+}

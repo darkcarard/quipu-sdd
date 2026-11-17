@@ -163,7 +163,7 @@ func TestValidate(t *testing.T) {
 		}
 	}
 	f := p.load()
-	if f.Phase != workflow.Validated || !strings.Contains(f.Next(), "merge branch sdd/user-signup") {
+	if f.Phase != workflow.Validated || !strings.Contains(f.Next(), "`sdd merge user-signup`") || f.State.ValidatedSHA != r.Head {
 		t.Errorf("phase %s, next %q", f.Phase, f.Next())
 	}
 

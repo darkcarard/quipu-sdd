@@ -83,9 +83,10 @@ In Claude Code:
 ```
 For each task, Claude calls `task_next`, writes the code, then calls `task_done`. At the end of the group it calls `group_verify`, and it stops when the group is waiting for your review. Then, in the terminal:
 ```sh
-sdd review <feature>            # summary; --diff for the full diff
-sdd approve <feature>           # or: sdd revise <feature> -m "what to change"
+sdd review G1                   # summary; --diff for the full diff
+sdd approve G1                  # or: sdd revise G1 -m "what to change"
 ```
+Inside Claude Code, prefix them with `!` (`! sdd approve G1`); `/sdd-implement` is a slash command and takes no `!`.
 Repeat `/sdd-implement <feature>` for each group until the plan is done.
 
 ## 7. Validate
@@ -93,6 +94,9 @@ Repeat `/sdd-implement <feature>` for each group until the plan is done.
 sdd validate <feature>          # writes .sdd/features/<feature>/report.md
 sdd trace --matrix <feature>
 git log --format='%h %s%n%(trailers)' sdd/<feature>
+sdd merge                       # from any directory: merges into the project's branch, removes the worktree
+git log --oneline               # approvals, group commits and the merge records are all on your branch
+git status                      # specs/ and .sdd/features/ are clean
 ```
 Optional: `/sdd-deep-review <feature>` in Claude Code.
 

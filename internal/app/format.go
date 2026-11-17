@@ -206,7 +206,7 @@ func FormatStarted(s implement.Started, feature string) string {
 		for _, t := range s.Group.Tasks {
 			sb.WriteString(taskLine(t) + "\n")
 		}
-		fmt.Fprintf(&sb, "\nNext: `/sdd-implement %s` in Claude Code (or have your agent call task_next)\n", feature)
+		fmt.Fprintf(&sb, "\nNext: type `/sdd-implement %s` in Claude Code (or have your agent call task_next)\n", feature)
 	}
 	if s.Message != "" {
 		fmt.Fprintf(&sb, "\n%s\n", s.Message)
@@ -391,4 +391,34 @@ func FormatValidation(r validate.Result) string {
 	fmt.Fprintf(&sb, "\nvalidation %s: %s, %s; report written to %s\n", result, Plural(errs, "error"), Plural(warns, "warning"), r.Report)
 	fmt.Fprintf(&sb, "\nNext: %s\n", r.Next)
 	return sb.String()
+}
+
+// FormatMerged renders the result of `sdd merge`.
+func FormatMerged(r Merged) string {
+	var sb strings.Builder
+	how := "with a merge commit"
+	if r.FF {
+		how = "fast-forward"
+	}
+	fmt.Fprintf(&sb, "merged %s into %s (%s, %s)\n", r.Branch, r.Into, how, Short(r.SHA))
+	if r.Removed {
+		sb.WriteString("removed the worktree; the branch is kept\n")
+	}
+	if r.Warning != "" {
+		fmt.Fprintf(&sb, "warning: %s\n", r.Warning)
+	}
+	sb.WriteString(FormatRecords(r.Records, r.Note))
+	fmt.Fprintf(&sb, "\nNext: %s\n", r.Next)
+	return sb.String()
+}
+
+// FormatRecords renders the outcome of committing a feature's specs and records.
+func FormatRecords(sha, note string) string {
+	switch {
+	case note != "":
+		return "warning: " + note + "\n"
+	case sha != "":
+		return fmt.Sprintf("committed the specs and records (%s)\n", Short(sha))
+	}
+	return ""
 }

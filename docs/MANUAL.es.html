@@ -334,7 +334,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <div class="files">
             <div class="file">rama sdd/&lt;f&gt; <small>1 commit / grupo</small></div>
           </div>
-          <div class="gate"><span class="label">Tu puerta, por grupo</span><code>sdd review &lt;f&gt;</code><code>sdd approve &lt;f&gt;</code></div>
+          <div class="gate"><span class="label">Tu puerta, por grupo</span><code>sdd review G1</code><code>sdd approve G1</code></div>
         </div>
         <div class="station">
           <div class="rail"><span class="num">4</span></div>
@@ -446,10 +446,10 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <div class="pair">
             <div><span class="tag you">en tu terminal</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
               <span class="tag agent" style="margin-top:14px">en Claude Code</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">&gt; </span>/sdd-implement &lt;f&gt;</pre></div></div>
-            <div><span class="tag you">en tu terminal, por grupo</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd review &lt;f&gt;        <span class="c"># --diff para ver el diff completo</span>
-<span class="p">$ </span>sdd approve &lt;f&gt;
+            <div><span class="tag you">en tu terminal, por grupo</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># --diff para ver el diff completo</span>
+<span class="p">$ </span>sdd approve G1
 <span class="c"># o devuélvelo:</span>
-<span class="p">$ </span>sdd revise &lt;f&gt; -m <span class="s">"Maneja el caso del archivo vacío"</span></pre></div></div>
+<span class="p">$ </span>sdd revise G1 -m <span class="s">"Maneja el caso del archivo vacío"</span></pre></div></div>
           </div>
           <div class="loop">
             <div class="legend"><span class="tag agent">agente</span><span class="tag sdd">sdd</span><span class="tag you">tú</span></div>
@@ -466,7 +466,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
               <span class="chip you">approve</span><span class="arrow">o</span><span class="chip you">revise</span><span class="arrow">→</span>
               <span class="chip agent">/sdd-implement</span>
             </div>
-            <p class="note">Si una verificación falla, el agente recibe la salida del error y lo corrige, hasta <code>limits.max_fix_attempts</code> veces (3 por defecto). Ejecuta <code>/sdd-implement &lt;f&gt;</code> de nuevo después de cada aprobación hasta terminar todos los grupos.</p>
+            <p class="note">Si una verificación falla, el agente recibe la salida del error y lo corrige, hasta <code>limits.max_fix_attempts</code> veces (3 por defecto). Ejecuta <code>/sdd-implement &lt;f&gt;</code> de nuevo después de cada aprobación hasta terminar todos los grupos. Dentro de Claude Code, ejecuta los comandos <code>sdd</code> con un <code>!</code> delante (<code>! sdd approve G1</code>); <code>/sdd-implement</code> es un comando slash y va sin <code>!</code>.</p>
           </div>
         </div>
       </div>
@@ -478,10 +478,11 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <p><code>sdd</code> ejecuta las pruebas de integración, comprueba que cada grupo tenga su commit y que cada criterio de aceptación tenga una prueba (un comentario <code>covers: AC-001</code>), y escribe el reporte. Si quieres, pide al agente una revisión semántica contra los criterios.</p>
           <div class="pair">
             <div><span class="tag you">en tu terminal</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd validate &lt;f&gt;
-<span class="p">$ </span>sdd trace --matrix &lt;f&gt;</pre></div></div>
+<span class="p">$ </span>sdd trace --matrix &lt;f&gt;
+<span class="p">$ </span>sdd merge &lt;f&gt;</pre></div></div>
             <div><span class="tag agent">en Claude Code · opcional</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">&gt; </span>/sdd-deep-review &lt;f&gt;</pre></div></div>
           </div>
-          <span class="check">Integra la rama <code>sdd/&lt;f&gt;</code> en tu rama principal como lo haga normalmente tu equipo.</span>
+          <span class="check"><code>sdd merge</code> integra la rama <code>sdd/&lt;f&gt;</code> en la rama activa de tu proyecto, desde cualquier directorio, elimina el worktree y hace commit de los registros de la feature. ¿Prefieres un pull request? Intégrala a tu manera y luego ejecuta <code>sdd clean &lt;f&gt;</code>.</span>
         </div>
       </div>
     </div>
@@ -512,7 +513,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <div class="head">
         <div class="eyebrow">Dónde queda todo</div>
         <h2>Todo es un archivo en tu repositorio</h2>
-        <p class="prose">Las specs, los planes, el estado y el journal de auditoría se guardan en git junto con tu código, así que el historial viaja con el proyecto. Los worktrees, locks y logs de ejecución son locales y se ignoran con <code>.sdd/.gitignore</code>.</p>
+        <p class="prose">Las specs, los planes, el estado y el journal de auditoría se guardan en git junto con tu código, así que el historial viaja con el proyecto: <code>sdd</code> hace commit de <code>specs/&lt;f&gt;/</code> y <code>.sdd/features/&lt;f&gt;/</code> en cada aprobación y en <code>sdd merge</code>, y de nada más que tengas en el stage. Los worktrees, locks y logs de ejecución son locales y se ignoran con <code>.sdd/.gitignore</code>.</p>
         <p class="prose"><code>log.md</code> es una versión legible del journal: cada paso, quién lo ejecutó (tú o <code>agent:claude-code</code>) y cuándo.</p>
       </div>
       <div class="tree"><span class="d">mi-proyecto/</span>
@@ -548,13 +549,14 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <tr><td><code>sdd init --agent claude</code></td><td class="who"><span class="tag you">tú</span></td><td>Prepara el proyecto para Claude Code. <code>--check</code> lista lo que falta.</td></tr>
           <tr><td><code>sdd status [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">cualquiera</span></td><td>Fase de cada feature y la siguiente acción.</td></tr>
           <tr><td><code>/sdd-spec</code> · <code>/sdd-tech</code> · <code>/sdd-plan</code></td><td class="who"><span class="tag agent">agente</span></td><td>Redactan la spec funcional, la spec técnica y el plan.</td></tr>
-          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">tú</span></td><td>Congela una spec con su contenido actual.</td></tr>
+          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">tú</span></td><td>Congela una spec con su contenido actual y hace commit de los registros de la feature.</td></tr>
           <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Congela el plan.</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Crea el worktree e inicia el primer grupo.</td></tr>
           <tr><td><code>/sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agente</span></td><td>Avanza por el grupo actual hasta dejarlo listo para revisión.</td></tr>
-          <tr><td><code>sdd review &lt;f&gt; [--diff]</code></td><td class="who"><span class="tag you">tú</span></td><td>Resumen del grupo que espera revisión.</td></tr>
-          <tr><td><code>sdd approve &lt;f&gt;</code> · <code>sdd revise &lt;f&gt; -m "…"</code></td><td class="who"><span class="tag you">tú</span></td><td>Acepta el grupo o lo devuelve con comentarios.</td></tr>
+          <tr><td><code>sdd review G1 [--diff]</code></td><td class="who"><span class="tag you">tú</span></td><td>Resumen del grupo que espera revisión. Acepta el ID del grupo, una feature, o nada cuando solo una feature se está implementando.</td></tr>
+          <tr><td><code>sdd approve G1</code> · <code>sdd revise G1 -m "…"</code></td><td class="who"><span class="tag you">tú</span></td><td>Acepta el grupo o lo devuelve con comentarios.</td></tr>
           <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Pruebas de integración, todas las verificaciones y <code>report.md</code>.</td></tr>
+          <tr><td><code>sdd merge [&lt;f&gt;]</code></td><td class="who"><span class="tag you">tú</span></td><td>Integra una feature validada en tu rama, elimina su worktree y hace commit de sus registros.</td></tr>
           <tr><td><code>sdd sync check [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">cualquiera</span></td><td>Consistencia entre specs, plan y código.</td></tr>
           <tr><td><code>sdd trace &lt;ID&gt;</code> · <code>--matrix &lt;f&gt;</code></td><td class="who"><span class="tag sdd">cualquiera</span></td><td>Sigue un ID o imprime la matriz de trazabilidad completa.</td></tr>
           <tr><td><code>sdd feature describe &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Cambia el título o la descripción de una feature.</td></tr>
@@ -578,7 +580,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <div><h3>Edité una spec después de aprobarla</h3><p>La aprobación ya no coincide. <code>sdd sync check</code> muestra qué quedó desactualizado; revisa el cambio y vuelve a aprobar.</p></div>
       <div><h3>El agente dice que no puede aprobar</h3><p>Es intencional. Ejecuta tú la aprobación en una terminal.</p></div>
       <div><h3>No aparecen las herramientas MCP</h3><p>Comprueba que <code>which sdd</code> encuentra el binario, reinicia Claude Code en la carpeta del proyecto y aprueba el servidor.</p></div>
-      <div><h3>Un grupo sigue fallando sus verificaciones</h3><p>Cuando se agotan los intentos de corrección, el grupo queda marcado como fallido y el agente se detiene. Revisa <code>sdd status &lt;f&gt;</code> y envía indicaciones con <code>sdd revise &lt;f&gt; -m "…"</code>.</p></div>
+      <div><h3>Un grupo sigue fallando sus verificaciones</h3><p>Cuando se agotan los intentos de corrección, el grupo queda marcado como fallido y el agente se detiene. Revisa <code>sdd status &lt;f&gt;</code> y envía indicaciones con <code>sdd revise G1 -m "…"</code> (el grupo fallido).</p></div>
     </div>
   </section>
 </div>

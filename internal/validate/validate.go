@@ -329,8 +329,11 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 		return out, err
 	}
 	_ = f.RenderLog()
-	if out.Passed && f.Phase == workflow.Implemented {
-		f.SetPhase(workflow.Validated)
+	if out.Passed {
+		f.State.ValidatedSHA = out.Head
+		if f.Phase == workflow.Implemented {
+			f.SetPhase(workflow.Validated)
+		}
 		if err := f.SaveState(); err != nil {
 			return out, err
 		}

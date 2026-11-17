@@ -210,6 +210,7 @@ func (a *App) approve(ctx context.Context, arg string, art workflow.Artifact) er
 		return nil
 	}
 	fmt.Fprintf(a.Stdout, "approved %s (%s) by %s\n", r.File, app.Short(r.Hash), r.By)
+	fmt.Fprint(a.Stdout, app.FormatRecords(r.Commit, r.CommitNote))
 	fmt.Fprintf(a.Stdout, "phase:   %s\n\nNext: %s\n", r.Phase, r.Next)
 	return nil
 }

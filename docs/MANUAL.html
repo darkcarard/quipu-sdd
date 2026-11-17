@@ -335,7 +335,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <div class="files">
             <div class="file">branch sdd/&lt;f&gt; <small>1 commit / group</small></div>
           </div>
-          <div class="gate"><span class="label">Your gate, per group</span><code>sdd review &lt;f&gt;</code><code>sdd approve &lt;f&gt;</code></div>
+          <div class="gate"><span class="label">Your gate, per group</span><code>sdd review G1</code><code>sdd approve G1</code></div>
         </div>
         <div class="station">
           <div class="rail"><span class="num">4</span></div>
@@ -449,10 +449,10 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <div class="pair">
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
               <span class="tag agent" style="margin-top:14px">in Claude Code</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-implement &lt;f&gt;</pre></div></div>
-            <div><span class="tag you">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review &lt;f&gt;        <span class="c"># --diff for the full diff</span>
-<span class="p">$ </span>sdd approve &lt;f&gt;
+            <div><span class="tag you">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># --diff for the full diff</span>
+<span class="p">$ </span>sdd approve G1
 <span class="c"># or send it back:</span>
-<span class="p">$ </span>sdd revise &lt;f&gt; -m <span class="s">"Handle the empty file case"</span></pre></div></div>
+<span class="p">$ </span>sdd revise G1 -m <span class="s">"Handle the empty file case"</span></pre></div></div>
           </div>
           <div class="loop">
             <div class="legend"><span class="tag agent">agent</span><span class="tag sdd">sdd</span><span class="tag you">you</span></div>
@@ -469,7 +469,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
               <span class="chip you">approve</span><span class="arrow">or</span><span class="chip you">revise</span><span class="arrow">→</span>
               <span class="chip agent">/sdd-implement</span>
             </div>
-            <p class="note">If a check fails, the agent gets the failing output and fixes it, up to <code>limits.max_fix_attempts</code> times (3 by default). Run <code>/sdd-implement &lt;f&gt;</code> again after each approval until every group is done.</p>
+            <p class="note">If a check fails, the agent gets the failing output and fixes it, up to <code>limits.max_fix_attempts</code> times (3 by default). Run <code>/sdd-implement &lt;f&gt;</code> again after each approval until every group is done. Inside Claude Code, run the <code>sdd</code> commands with a leading <code>!</code> (<code>! sdd approve G1</code>); <code>/sdd-implement</code> is a slash command and takes no <code>!</code>.</p>
           </div>
         </div>
       </div>
@@ -481,10 +481,11 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <p><code>sdd</code> runs the integration tests, checks that every group has its commit and every acceptance criterion has a test (a <code>covers: AC-001</code> comment), and writes the report. Optionally, ask the agent for a semantic review against the criteria.</p>
           <div class="pair">
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd validate &lt;f&gt;
-<span class="p">$ </span>sdd trace --matrix &lt;f&gt;</pre></div></div>
+<span class="p">$ </span>sdd trace --matrix &lt;f&gt;
+<span class="p">$ </span>sdd merge &lt;f&gt;</pre></div></div>
             <div><span class="tag agent">in Claude Code · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span>/sdd-deep-review &lt;f&gt;</pre></div></div>
           </div>
-          <span class="check">Merge branch <code>sdd/&lt;f&gt;</code> into your main branch the way your team usually does.</span>
+          <span class="check"><code>sdd merge</code> merges branch <code>sdd/&lt;f&gt;</code> into the branch checked out in your project, from any directory, removes the worktree and commits the feature's records. Prefer a pull request? Merge it your way, then run <code>sdd clean &lt;f&gt;</code>.</span>
         </div>
       </div>
     </div>
@@ -517,7 +518,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <div class="head">
         <div class="eyebrow">Where things live</div>
         <h2>Everything is a file in your repo</h2>
-        <p class="prose">Specs, plans, state and the audit journal are committed with your code, so the history travels with the project. Worktrees, locks and run logs stay local and are ignored through <code>.sdd/.gitignore</code>.</p>
+        <p class="prose">Specs, plans, state and the audit journal are committed with your code, so the history travels with the project: <code>sdd</code> commits a feature's <code>specs/&lt;f&gt;/</code> and <code>.sdd/features/&lt;f&gt;/</code> on every approval and on <code>sdd merge</code>, and nothing else you have staged. Worktrees, locks and run logs stay local and are ignored through <code>.sdd/.gitignore</code>.</p>
         <p class="prose"><code>log.md</code> is a readable version of the journal: every step, who ran it (you, or <code>agent:claude-code</code>) and when.</p>
       </div>
       <div class="tree"><span class="d">my-project/</span>
@@ -553,13 +554,14 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
           <tr><td><code>sdd init --agent claude</code></td><td class="who"><span class="tag you">you</span></td><td>Set up the project for Claude Code. <code>--check</code> lists what is missing.</td></tr>
           <tr><td><code>sdd status [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Phase of each feature and the next action.</td></tr>
           <tr><td><code>/sdd-spec</code> · <code>/sdd-tech</code> · <code>/sdd-plan</code></td><td class="who"><span class="tag agent">agent</span></td><td>Draft the functional spec, the technical spec, the plan.</td></tr>
-          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content.</td></tr>
+          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content and commit the feature's records.</td></tr>
           <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan.</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Create the worktree and start the first group.</td></tr>
           <tr><td><code>/sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
-          <tr><td><code>sdd review &lt;f&gt; [--diff]</code></td><td class="who"><span class="tag you">you</span></td><td>Summary of the group waiting for review.</td></tr>
-          <tr><td><code>sdd approve &lt;f&gt;</code> · <code>sdd revise &lt;f&gt; -m "…"</code></td><td class="who"><span class="tag you">you</span></td><td>Accept the group, or send it back with feedback.</td></tr>
+          <tr><td><code>sdd review G1 [--diff]</code></td><td class="who"><span class="tag you">you</span></td><td>Summary of the group waiting for review. Takes the group ID, a feature, or nothing when one feature is being implemented.</td></tr>
+          <tr><td><code>sdd approve G1</code> · <code>sdd revise G1 -m "…"</code></td><td class="who"><span class="tag you">you</span></td><td>Accept the group, or send it back with feedback.</td></tr>
           <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Integration tests, all checks, <code>report.md</code>.</td></tr>
+          <tr><td><code>sdd merge [&lt;f&gt;]</code></td><td class="who"><span class="tag you">you</span></td><td>Merge a validated feature into your branch, remove its worktree, commit its records.</td></tr>
           <tr><td><code>sdd sync check [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Consistency between specs, plan and code.</td></tr>
           <tr><td><code>sdd trace &lt;ID&gt;</code> · <code>--matrix &lt;f&gt;</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Follow one ID, or print the full traceability matrix.</td></tr>
           <tr><td><code>sdd feature describe &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Change a feature's title or description.</td></tr>
@@ -584,7 +586,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <div><h3>I edited a spec after approving it</h3><p>The approval no longer matches. <code>sdd sync check</code> shows what is stale; review the change and approve it again.</p></div>
       <div><h3>The agent says it cannot approve</h3><p>That is by design. Run the approval yourself in a terminal.</p></div>
       <div><h3>The MCP tools don't show up</h3><p>Check that <code>which sdd</code> finds the binary, then restart Claude Code in the project folder and approve the server.</p></div>
-      <div><h3>A group keeps failing its checks</h3><p>After the fix attempts run out, the group is marked failed and the agent stops. Check <code>sdd status &lt;f&gt;</code>, then send guidance with <code>sdd revise &lt;f&gt; -m "…"</code>.</p></div>
+      <div><h3>A group keeps failing its checks</h3><p>After the fix attempts run out, the group is marked failed and the agent stops. Check <code>sdd status &lt;f&gt;</code>, then send guidance with <code>sdd revise G1 -m "…"</code> (the failed group).</p></div>
     </div>
   </section>
 </div>

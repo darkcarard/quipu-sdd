@@ -36,6 +36,9 @@ type Session struct {
 	Limits config.Limits
 	// Profile reads a language profile (nil: .sdd/profiles/<language>.md).
 	Profile func(language string) (string, error)
+	// Group, when set, is the group the user named (`sdd approve G2`): the
+	// review commands fail unless it is the group they would act on.
+	Group string
 }
 
 // Errors for the operations a feature's phase does not allow.
@@ -113,6 +116,25 @@ func (s *Session) syncGroups() {
 		groups = append(groups, g)
 	}
 	s.F.State.Groups = groups
+}
+
+// target returns the active group for a review command, checking it against
+// the group the user named.
+func (s *Session) target() (*state.GroupState, error) {
+	g := s.active()
+	if s.Group == "" || (g != nil && strings.EqualFold(g.ID, s.Group)) {
+		return g, nil
+	}
+	for _, o := range s.F.State.Groups {
+		if strings.EqualFold(o.ID, s.Group) {
+			cur := "every group is approved"
+			if g != nil {
+				cur = fmt.Sprintf("the current group is %s (%s)", g.ID, g.Status)
+			}
+			return nil, fmt.Errorf("%s is %s; %s", o.ID, o.Status, cur)
+		}
+	}
+	return nil, fmt.Errorf("%s has no group %s", s.F.Name, s.Group)
 }
 
 // active returns the first group that is not approved, or nil when all are.
@@ -195,10 +217,10 @@ func (s *Session) openGroup(ctx context.Context, wt *workspace.Worktree) (*state
 	}
 	switch g.Status {
 	case workflow.GroupAwaitingReview:
-		return nil, fmt.Sprintf("%s awaits the user's review: stop and ask the user to run `sdd review %s`", g.ID, s.F.Name), nil
+		return nil, fmt.Sprintf("%s awaits the user's review: stop and ask the user to run `sdd review %s`", g.ID, g.ID), nil
 	case workflow.GroupFailed:
 		return nil, fmt.Sprintf("%s failed verification %d times: stop and ask the user to inspect it and run `sdd revise %s -m \"<guidance>\"`",
-			g.ID, g.Attempts, s.F.Name), nil
+			g.ID, g.Attempts, g.ID), nil
 	case workflow.GroupPending:
 		head, err := wt.Head(ctx)
 		if err != nil {
@@ -598,7 +620,7 @@ func GroupVerify(ctx context.Context, s *Session) (Verified, error) {
 		if s.Limits.MaxFixAttempts > 0 && g.Attempts >= s.Limits.MaxFixAttempts {
 			g.Status, out.Failed = workflow.GroupFailed, true
 			out.Next = fmt.Sprintf("stop: %s failed verification %d times; tell the user, who decides with `sdd revise %s -m \"<guidance>\"`",
-				g.ID, g.Attempts, f.Name)
+				g.ID, g.Attempts, g.ID)
 		} else {
 			out.Next = fmt.Sprintf("fix the failures in the worktree, then call group_verify again (attempt %d of %d)", g.Attempts+1, s.Limits.MaxFixAttempts)
 		}
@@ -636,7 +658,7 @@ func GroupVerify(ctx context.Context, s *Session) (Verified, error) {
 	}
 	_ = s.record(journal.Event{Action: "group.committed", Status: journal.Info, IDs: append([]string{g.ID}, tasks...),
 		Detail: short(sha) + " " + out.Subject})
-	out.Next = fmt.Sprintf("stop: %s is committed and awaits the user's review; ask the user to run `sdd review %s`", g.ID, f.Name)
+	out.Next = fmt.Sprintf("stop: %s is committed and awaits the user's review; ask the user to run `sdd review %s`", g.ID, g.ID)
 	return out, s.save()
 }
 

@@ -126,8 +126,21 @@ type FeatureState struct {
 	Worktree  string                                  `json:"worktree,omitempty"`
 	Branch    string                                  `json:"branch,omitempty"`
 	// CheckpointSHA is the last commit known to contain finished work.
-	CheckpointSHA string    `json:"checkpoint_sha,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CheckpointSHA string `json:"checkpoint_sha,omitempty"`
+	// ValidatedSHA is the branch commit that the last passing validation checked.
+	ValidatedSHA string `json:"validated_sha,omitempty"`
+	// Merged records `sdd merge`.
+	Merged    *Merge    `json:"merged,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Merge records where a validated feature's branch was merged.
+type Merge struct {
+	Into string    `json:"into"`         // the branch merged into
+	SHA  string    `json:"sha"`          // its HEAD after the merge
+	FF   bool      `json:"ff,omitempty"` // fast-forward
+	By   string    `json:"by"`
+	At   time.Time `json:"at"`
 }
 
 // Cursor points at the work in progress.

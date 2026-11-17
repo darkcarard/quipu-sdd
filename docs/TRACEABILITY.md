@@ -42,7 +42,7 @@ An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqual
 |---|---|
 | `seq` | Monotonic sequence number per feature |
 | `actor` | `user:<git user.email>` for CLI commands, `agent:<client>` for MCP calls (the client name the agent reports, e.g. `agent:claude-code`) |
-| `action` | e.g. `feature.describe`, `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `task.start`, `task.done`, `group.verify`, `group.committed`, `group.approved`, `group.revise` |
+| `action` | e.g. `feature.describe`, `spec.create`, `spec.approve`, `plan.create`, `plan.approve`, `task.start`, `task.done`, `group.verify`, `group.committed`, `group.approved`, `group.revise`, `feature.validate`, `feature.merge`, `worktree.clean` |
 | `status` | `started`, `completed`, `failed` (see write-ahead below) or `info` for standalone events |
 | `ref` | On `completed` or `failed`: the `seq` of the matching `started` event |
 | `hashes` | Hashes of the artifacts involved. Every approval records the exact hash it approved |
@@ -88,4 +88,4 @@ Recovery rests on three principles:
 
 `sdd status <feature>` shows the current state, the progress of every group and task, any interrupted action, the lock holder and the exact next command to run.
 
-`sdd resume` and `sdd clean` can throw work away, so the permission rules installed by `sdd init --agent claude` deny them to the agent along with the approvals.
+`sdd resume` and `sdd clean` can throw work away and `sdd merge` changes your branch, so the permission rules installed by `sdd init --agent claude` deny them to the agent along with the approvals.

@@ -20,6 +20,22 @@ func (a *App) oneFeature(fs *flag.FlagSet, args []string, usage string) (string,
 	return pos[0], nil
 }
 
+// optionalTarget parses at most one positional argument (a feature or a group
+// ID; empty when omitted) and the flags defined on fs.
+func (a *App) optionalTarget(fs *flag.FlagSet, args []string, usage string) (string, error) {
+	pos, err := parseArgs(fs, args)
+	if err != nil {
+		return "", err
+	}
+	if len(pos) > 1 {
+		return "", a.usageErr(usage)
+	}
+	if len(pos) == 0 {
+		return "", nil
+	}
+	return pos[0], nil
+}
+
 func (a *App) runImplement(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("implement")
 	arg, err := a.oneFeature(fs, args, "sdd implement <feature>")
@@ -106,7 +122,7 @@ func (a *App) runReview(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("review")
 	diff := fs.Bool("diff", false, "also print the full diff")
 	brief := fs.Bool("context", false, "print the brief for a deep review of the implemented feature (what review_context returns)")
-	arg, err := a.oneFeature(fs, args, "sdd review <feature> [--diff | --context]")
+	arg, err := a.optionalTarget(fs, args, "sdd review [<group> | <feature>] [--diff | --context]")
 	if err != nil {
 		return err
 	}
@@ -115,6 +131,9 @@ func (a *App) runReview(ctx context.Context, args []string) error {
 		return err
 	}
 	if *brief {
+		if arg == "" {
+			return a.usageErr("sdd review <feature> --context")
+		}
 		text, err := p.ReviewContext(ctx, arg)
 		if err != nil {
 			return err
@@ -132,7 +151,7 @@ func (a *App) runReview(ctx context.Context, args []string) error {
 
 func (a *App) runApproveGroup(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("approve")
-	arg, err := a.oneFeature(fs, args, "sdd approve <feature>")
+	arg, err := a.optionalTarget(fs, args, "sdd approve [<group> | <feature>]")
 	if err != nil {
 		return err
 	}
@@ -151,7 +170,7 @@ func (a *App) runApproveGroup(ctx context.Context, args []string) error {
 func (a *App) runRevise(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("revise")
 	msg := fs.String("m", "", "what the agent should change (required)")
-	arg, err := a.oneFeature(fs, args, `sdd revise <feature> -m "<feedback>"`)
+	arg, err := a.optionalTarget(fs, args, `sdd revise [<group> | <feature>] -m "<feedback>"`)
 	if err != nil {
 		return err
 	}
@@ -163,7 +182,25 @@ func (a *App) runRevise(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(a.Stdout, "%s is back in progress with your feedback (revision %d).\n\nNext: `/sdd-implement %s` in Claude Code; the agent gets the feedback from task_next.\n", g.ID, g.Revisions, arg)
+	fmt.Fprintf(a.Stdout, "%s is back in progress with your feedback (revision %d).\n\nNext: type `/sdd-implement %s` in Claude Code; the agent gets the feedback from task_next.\n", g.ID, g.Revisions, g.Feature)
+	return nil
+}
+
+func (a *App) runMerge(ctx context.Context, args []string) error {
+	fs := a.newFlagSet("merge")
+	arg, err := a.optionalTarget(fs, args, "sdd merge [<feature>]")
+	if err != nil {
+		return err
+	}
+	p, err := a.open()
+	if err != nil {
+		return err
+	}
+	r, err := p.Merge(ctx, arg)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(a.Stdout, app.FormatMerged(r))
 	return nil
 }
 

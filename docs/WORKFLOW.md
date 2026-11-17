@@ -81,7 +81,7 @@ The feature state is stored in `.sdd/features/<feature>/state.json`:
 | `plan-approved` | Plan frozen | `sdd implement` |
 | `implementing` | Groups being executed (see group states) | last group approved |
 | `implemented` | All groups committed and approved | `sdd validate` passes |
-| `validated` | Integration tests and sync checks pass | — |
+| `validated` | Integration tests and sync checks pass | — (`sdd merge` records the merge; the phase stays) |
 | `baselined` | Baseline feature: both specs approved, describing code that already exists (no plan, no implementation) | a revision of the baseline specs |
 
 Up to `plan-approved`, the phase is **derived from the artifacts**: their existence, the approvals in `state.json` and the current content hashes (see the staleness rule below). Editing a file by hand or pulling a teammate's changes is therefore always reflected by `sdd status`, and an edited or stale artifact reopens its `*-drafting` phase. From `implementing` onwards, the phase stored in `state.json` is kept as long as every artifact is still approved. The stored phase is updated on the next command that writes state, such as an approval.
@@ -106,7 +106,7 @@ If a source changes after approval, every artifact that depends on it becomes **
 | `/sdd-spec <feature or "Free text">` | user → agent | Draft the functional spec with the agent |
 | `sdd spec new <feature or "Free text"> [--name <feature>] [--title "<title>"] [--description "<text>"]` | user or agent | Create `specs/<feature>/functional.md` from the template and record the feature name, title and description (see [feature names](SPEC_GUIDELINES.md#project-layout)) |
 | `sdd spec lint [<feature>]` | user or agent | Deterministic guardrail checks (see [SPEC_GUIDELINES.md](SPEC_GUIDELINES.md)) |
-| `sdd spec approve <feature> --functional` | **user** | Freeze the functional spec (lint must pass) |
+| `sdd spec approve <feature> --functional` | **user** | Freeze the functional spec (lint must pass) and commit the feature's records (see below) |
 | `/sdd-tech <feature>` | user → agent | Draft the technical spec. Only allowed after functional approval |
 | `sdd spec new <feature> --technical` | user or agent | Create `technical.md` from the template |
 | `sdd spec approve <feature> --technical` | **user** | Freeze the technical spec (lint + sync must pass) |
@@ -152,9 +152,9 @@ Validation (deterministic):
 | `/sdd-implement <feature>` | user → agent | Work through the group's tasks with `task_next` / `task_done`, then `group_verify` |
 | `sdd task next <feature>` / `sdd task done <feature> [--summary "…"]` | agent | CLI forms of the MCP tools |
 | `sdd group verify <feature>` | agent | CLI form of `group_verify` |
-| `sdd review <feature> [--diff]` | **user** | Show the group: its commit, tasks with covered IDs and the agent's summaries, the verification results, the changes (`--diff` for the full diff) and any files changed outside the declared ones |
-| `sdd approve <feature>` | **user** | Approve the group under review; the agent's next `task_next` starts the next group |
-| `sdd revise <feature> -m "<feedback>"` | **user** | Send the group back with feedback; the agent gets it from `task_next` |
+| `sdd review [<group>\|<feature>] [--diff]` | **user** | Show the group: its commit, tasks with covered IDs and the agent's summaries, the verification results, the changes (`--diff` for the full diff) and any files changed outside the declared ones |
+| `sdd approve [<group>\|<feature>]` | **user** | Approve the group under review; the agent's next `task_next` starts the next group |
+| `sdd revise [<group>\|<feature>] -m "<feedback>"` | **user** | Send the group back with feedback; the agent gets it from `task_next` |
 | `sdd resume <feature> [--discard] [--force-unlock]` | **user** | Repair state after an interruption (see [TRACEABILITY.md](TRACEABILITY.md)) |
 | `sdd clean <feature> [--force]` | **user** | Remove the worktree; the branch and its commits are kept, and the next command that needs the worktree recreates it |
 
@@ -177,6 +177,8 @@ For each group:
 
 The agent never commits itself, and a group never advances while the code fails to build or its tests fail. After `sdd revise`, `task_next` returns the feedback (and the group's changes so far) instead of a task; the agent addresses it and calls `group_verify` again, which squashes the group into a single commit once more. A `failed` group also goes back to the agent through `sdd revise`, with guidance. If a spec or the plan is edited during implementation, the feature leaves `implementing` (it becomes stale) and every implementation command stops until the artifacts are re-approved.
 
+`review`, `approve` and `revise` take the group ID (`sdd approve G2`): it names the feature being implemented whose current group it is, and must be that group. With no argument they act on the only feature being implemented; a feature name works too, and is needed when two features have the same current group.
+
 The verification commands run with the project's own shell (`sh -c`, or `cmd /C` on Windows) in the worktree and are killed, with their child processes, after `limits.command_timeout`. Only the tail of a failing command's output goes back to the agent and into the review: `limits.output_tail` characters (6000 by default), which bounds the token cost of failures.
 
 ## Phase 4: Validate (integration + synchronization)
@@ -188,8 +190,11 @@ The verification commands run with the project's own shell (`sh -c`, or `cmd /C`
 | `sdd trace <ID>` / `sdd trace --matrix <feature>` | anyone | Follow one ID through spec → plan → commits → tests, or print the full matrix (with Commits and Tests columns once implementation has started) |
 | `/sdd-deep-review <feature>` | user → agent | Semantic review of the code against each AC, written to `.sdd/features/<feature>/deep-review.md` |
 | `sdd review <feature> --context` | agent | CLI form of `review_context`: the brief for the deep review |
+| `sdd merge [<feature>]` | **user** | Merge a validated feature (see below) |
 
-The report records the verdict, who validated and when, the branch commit, the approved hash of every artifact, the integration output, every consistency problem, the groups with their commits, and the full traceability matrix. It links `deep-review.md` when one exists. After validation, merge `sdd/<feature>` by your usual process and run `sdd clean <feature>`.
+The report records the verdict, who validated and when, the branch commit, the approved hash of every artifact, the integration output, every consistency problem, the groups with their commits, and the full traceability matrix. It links `deep-review.md` when one exists.
+
+After validation, `sdd merge <feature>` (or just `sdd merge` when only one feature is validated) merges `sdd/<feature>` into the branch checked out in the project, whatever directory it runs from: a fast-forward when possible, otherwise a merge commit; a merge with conflicts is aborted and nothing changes. It refuses if the branch moved since validation or the worktree has uncommitted changes. Then it removes the worktree (the branch is kept: delete it with `git branch -d` when you no longer need it), records the merge in `state.json` and the journal, and commits the feature's records. To merge your own way (a pull request, a rebase), do it and run `sdd clean <feature>`.
 
 Sync levels, each applied as soon as its artifacts exist:
 - **spec ↔ spec:** `functional_hash` matches, every FR, NFR and AC is mapped in the technical spec, every ID the technical spec references exists in the functional spec, and every `depends_on` feature exists.
@@ -224,6 +229,14 @@ Afterwards:
 - `sync check` warns when a feature depends on a baseline that is not (or no longer) `baselined`, or on a regular feature whose functional spec is not approved.
 - When a later feature changes adopted behavior, the baseline spec is revised in the same way as any spec (retire or amend its IDs and re-approve): editing it reopens it, and re-approving both specs makes it `baselined` again, so the baseline keeps describing the code as it is.
 
+## Committed Records
+
+`sdd` commits a feature's records, `specs/<feature>/` and `.sdd/features/<feature>/` (specs, plan, state, journal, log, report), on the branch checked out in the project:
+- on every approval of a spec or the plan (`sdd(<feature>): approve the functional spec`), so approved specs reach every clone, and `sdd implement` branches from a commit that contains them;
+- on `sdd merge`, after the merge (`sdd(<feature>): records of the merge into <branch>`), with the group approvals, the validation report and any deep review.
+
+Only those two paths are committed: whatever else you have staged stays staged. The commits carry an `SDD-Feature` trailer. Outside a git repository, or if the commit fails, the approval still succeeds and `sdd` says what to commit by hand.
+
 ## Commands at a Glance
 
 ```
@@ -232,7 +245,8 @@ sdd adopt --context
 sdd feature describe <feature> [--title "<title>"] [--description "<text>"]
 sdd spec new [--technical|--baseline]|lint|approve
 sdd plan new <feature> | plan approve <feature>
-sdd implement | review | approve | revise | resume | clean <feature>
+sdd implement | resume | clean <feature>
+sdd review | approve | revise [<group>|<feature>]   ·   sdd merge [<feature>]
 sdd task next|done <feature> · sdd group verify <feature>        (used by the agent)
 sdd validate <feature>
 sdd sync check [<feature>]

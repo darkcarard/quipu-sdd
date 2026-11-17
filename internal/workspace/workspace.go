@@ -272,3 +272,58 @@ func (g Git) Log(ctx context.Context, revRange string) ([]Commit, error) {
 	}
 	return commits, nil
 }
+
+// ErrNotRepo is returned when a directory is not inside a git work tree.
+var ErrNotRepo = errors.New("not a git repository")
+
+// CommitPaths commits the current content of paths (relative to Dir; missing
+// ones are skipped) and nothing else: changes the user staged elsewhere stay
+// staged. It returns the new commit's SHA, or "" when the paths had nothing to commit.
+func (g Git) CommitPaths(ctx context.Context, message string, paths ...string) (string, error) {
+	if _, err := g.Run(ctx, "rev-parse", "--is-inside-work-tree"); err != nil {
+		return "", ErrNotRepo
+	}
+	var present []string
+	for _, p := range paths {
+		if _, err := os.Stat(filepath.Join(g.Dir, filepath.FromSlash(p))); err == nil {
+			present = append(present, p)
+		}
+	}
+	if len(present) == 0 {
+		return "", nil
+	}
+	if _, err := g.Run(ctx, append([]string{"add", "--all", "--"}, present...)...); err != nil {
+		return "", err
+	}
+	if _, err := g.Run(ctx, append([]string{"diff", "--cached", "--quiet", "--"}, present...)...); err == nil {
+		return "", nil // nothing staged under these paths
+	}
+	if _, err := g.Run(ctx, append([]string{"commit", "--quiet", "--no-verify", "-m", message, "--only", "--"}, present...)...); err != nil {
+		return "", err
+	}
+	return g.Run(ctx, "rev-parse", "HEAD")
+}
+
+// CurrentBranch returns the branch checked out in Dir; it fails on a detached HEAD.
+func (g Git) CurrentBranch(ctx context.Context) (string, error) {
+	b, err := g.Run(ctx, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil {
+		return "", fmt.Errorf("%s is on a detached HEAD: check out the branch to work on", g.Dir)
+	}
+	return b, nil
+}
+
+// Merge merges branch into the branch checked out in Dir: a fast-forward when
+// possible, otherwise a merge commit with message. A merge that stops on
+// conflicts is aborted, leaving the checkout as it was. It reports whether it
+// fast-forwarded.
+func (g Git) Merge(ctx context.Context, branch, message string) (bool, error) {
+	if _, err := g.Run(ctx, "merge", "--ff-only", "--quiet", branch); err == nil {
+		return true, nil
+	}
+	if _, err := g.Run(ctx, "merge", "--no-ff", "--no-edit", "--quiet", "-m", message, branch); err != nil {
+		_, _ = g.Run(ctx, "merge", "--abort")
+		return false, err
+	}
+	return false, nil
+}

@@ -44,13 +44,14 @@ sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and the Claude Code setup
 /sdd-plan user-signup                  # then the plan (approve each one as above)
 ! sdd implement user-signup            # creates the worktree .sdd/worktrees/user-signup
 /sdd-implement user-signup             # the agent implements the first group, task by task
-! sdd review user-signup               # you review the group's commit
-! sdd approve user-signup              # or: sdd revise user-signup -m "..."
+! sdd review G1                        # you review the group's commit
+! sdd approve G1                       # or: sdd revise G1 -m "..."
 ! sdd validate user-signup             # once every group is approved: report.md
 /sdd-deep-review user-signup           # optional: the agent checks each AC against the code
+! sdd merge user-signup                # merge into your branch and remove the worktree
 ```
 
-`sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths:
+`sdd init` creates the following, and you commit all of it with your project except the git-ignored ephemeral paths (`sdd` itself commits each feature's `specs/` and `.sdd/features/` records on every approval and on `sdd merge`):
 
 ```
 sdd.yaml                     # limits
