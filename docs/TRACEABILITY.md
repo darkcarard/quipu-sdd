@@ -48,7 +48,9 @@ An ID can be qualified with its feature (`sdd trace user-signup/AC-003`); unqual
 | `hashes` | Hashes of the artifacts involved. Every approval records the exact hash it approved |
 
 ### Transcripts
-`.sdd/runs/<run-id>/transcript.jsonl` records every provider request and response and every tool call with its result. Credentials and anything matching a configured secret pattern are redacted. The directory is git-ignored by default; set `audit.commit_transcripts: true` to version it.
+`.sdd/runs/<run-id>/transcript.jsonl` records every provider request and response and every tool call with its result. Each line has a `seq`, a `kind` (`request`, `response`, `error`, `retry`, `tool_call`, `tool_result`) and a `call` number that pairs a request or tool call with its outcome. Every attempt is recorded, including the ones that were retried.
+
+Before a line is written it is redacted: the provider API key, every environment value (process or `.env`) whose name looks like a credential (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `CREDENTIAL`, `AUTH`), built-in credential patterns (Anthropic, OpenAI, Google, AWS, GitHub and Slack keys, bearer tokens, PEM private keys) and the extra regular expressions in `audit.redact_patterns` are replaced with `[REDACTED]`. The file is created with mode `0600`. The directory is git-ignored by default; set `audit.commit_transcripts: true` to version it.
 
 ## 3. Checkpoints and Recovery
 
@@ -68,7 +70,8 @@ Recovery rests on three principles:
 | Lock | `.sdd/locks/<feature>.lock` | PID, host and start time. Prevents two runs on the same feature at once |
 
 ### Failure handling
-- **Network or provider errors:** exponential backoff with jitter on connection errors and on HTTP 429, 5xx and 529. When retries run out, the run checkpoints and exits with `run "sdd resume <feature>"`.
+- **Network or provider errors:** exponential backoff with jitter (1 s doubling up to 60 s, at most `limits.max_retries` retries) on connection errors, on HTTP 408, 409, 429, 5xx and 529, and on overload errors inside a stream. A provider's `retry-after` delay takes precedence. A stream is retried only while nothing has been received from it; a failure after that is left to the task-level checkpoint. A response that sends no data for `limits.request_timeout` is abandoned and retried. When retries run out, the run checkpoints and exits with `run "sdd resume <feature>"`.
+- **Token budget:** when `limits.token_budget` is set, no request is sent once the run has used that many tokens (input, cache writes, cache reads and output).
 - **Ctrl+C / SIGTERM:** the run context is cancelled, the current task is marked `interrupted`, state is saved and the process exits cleanly.
 - **Crash or power loss:** the next command sees an interrupted action in the journal and a lock whose process is gone, and offers `sdd resume`.
 

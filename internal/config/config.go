@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -48,7 +50,15 @@ type Provider struct {
 	Name      string `yaml:"name"`        // anthropic | gemini | openai
 	Model     string `yaml:"model"`       // provider-specific model id
 	APIKeyEnv string `yaml:"api_key_env"` // name of the env var holding the key (never the key itself)
-	MaxTokens int    `yaml:"max_tokens"`  // max output tokens per request
+	MaxTokens int    `yaml:"max_tokens"`  // max output tokens per request (thinking included)
+	// Effort trades thoroughness for tokens: low | medium | high | xhigh | max.
+	Effort string `yaml:"effort"`
+	// ThinkingDisplay controls what reasoning comes back: omitted | summarized | updates.
+	ThinkingDisplay string `yaml:"thinking_display"`
+	// Fallbacks lets the provider re-serve a declined request with a fallback model.
+	Fallbacks bool `yaml:"fallbacks"`
+	// BaseURL overrides the provider endpoint (e.g. a proxy); empty uses the official one.
+	BaseURL string `yaml:"base_url"`
 }
 
 // Limits bound the agent loops. See docs/BRIEF.md §4.
@@ -75,6 +85,9 @@ type MCPServer struct {
 // Audit controls what is persisted for traceability.
 type Audit struct {
 	CommitTranscripts bool `yaml:"commit_transcripts"`
+	// RedactPatterns are extra regular expressions redacted from transcripts,
+	// in addition to the built-in credential patterns and the configured secrets.
+	RedactPatterns []string `yaml:"redact_patterns"`
 }
 
 // Default returns the built-in configuration.
@@ -85,7 +98,9 @@ func Default() Config {
 			Name:      "anthropic",
 			Model:     "claude-opus-5-5",
 			APIKeyEnv: "ANTHROPIC_API_KEY",
-			MaxTokens: 16000,
+			MaxTokens: 64000,
+			Effort:    "high",
+			Fallbacks: true,
 		},
 		Limits: Limits{
 			MaxIterationsPerTask: 30,
@@ -96,6 +111,7 @@ func Default() Config {
 			CommandTimeout:       10 * time.Minute,
 		},
 		MCPServers: []MCPServer{},
+		Audit:      Audit{RedactPatterns: []string{}},
 	}
 }
 
@@ -109,14 +125,18 @@ provider:
   name: anthropic             # anthropic | gemini | openai
   model: claude-opus-5-5
   api_key_env: ANTHROPIC_API_KEY
-  max_tokens: 16000
+  max_tokens: 64000           # per response, thinking included
+  effort: high                # low | medium | high | xhigh | max
+  thinking_display: ""        # omitted (default) | summarized | updates
+  fallbacks: true             # re-serve declined requests with a fallback model
+  base_url: ""                # empty: the provider's official endpoint
 
 limits:
   max_iterations_per_task: 30 # agent turns per task
   max_fix_attempts: 3         # verification fix loops per group
   max_files_per_task: 5       # plan validation: keeps tasks reviewable
   max_retries: 5              # provider retries (429/5xx/529/network)
-  request_timeout: 5m
+  request_timeout: 5m         # abandon a response after this long without data
   command_timeout: 10m
   token_budget: 0             # per run; 0 = unlimited
 
@@ -129,6 +149,7 @@ mcp_servers: []
 
 audit:
   commit_transcripts: false   # .sdd/runs/ is git-ignored unless true
+  redact_patterns: []         # extra regexps redacted from transcripts
 `, version.LayoutVersion)
 }
 
@@ -173,6 +194,24 @@ func (c Config) Validate() error {
 	if c.Provider.Model == "" {
 		errs = append(errs, errors.New("provider.model: required"))
 	}
+	switch c.Provider.Effort {
+	case "", "low", "medium", "high", "xhigh", "max":
+	default:
+		errs = append(errs, fmt.Errorf("provider.effort: %q is not one of low, medium, high, xhigh, max", c.Provider.Effort))
+	}
+	switch c.Provider.ThinkingDisplay {
+	case "", "omitted", "summarized", "updates":
+	default:
+		errs = append(errs, fmt.Errorf("provider.thinking_display: %q is not one of omitted, summarized, updates", c.Provider.ThinkingDisplay))
+	}
+	if c.Provider.MaxTokens < 1 {
+		errs = append(errs, errors.New("provider.max_tokens: must be >= 1"))
+	}
+	for i, p := range c.Audit.RedactPatterns {
+		if _, err := regexp.Compile(p); err != nil {
+			errs = append(errs, fmt.Errorf("audit.redact_patterns[%d]: %w", i, err))
+		}
+	}
 	if c.Limits.MaxFilesPerTask < 1 {
 		errs = append(errs, errors.New("limits.max_files_per_task: must be >= 1"))
 	}
@@ -199,6 +238,30 @@ func (c Config) APIKey() (string, error) {
 		return v, nil
 	}
 	return "", fmt.Errorf("%s is not set: export it or add it to %s", c.Provider.APIKeyEnv, DotEnvFile)
+}
+
+// secretNameRe matches environment variable names that hold credentials.
+var secretNameRe = regexp.MustCompile(`(?i)(KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)`)
+
+// Secrets returns the values to redact from transcripts and logs: the provider
+// API key and every environment value (process or .env) whose name looks like
+// a credential.
+func (c Config) Secrets() []string {
+	var out []string
+	if v, ok := c.Lookup(c.Provider.APIKeyEnv); ok && v != "" {
+		out = append(out, v)
+	}
+	keys := make([]string, 0, len(c.env))
+	for k := range c.env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		if v := c.env[k]; v != "" && secretNameRe.MatchString(k) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // loadEnv merges <root>/.env with the process environment (process wins).

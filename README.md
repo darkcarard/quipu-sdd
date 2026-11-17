@@ -9,7 +9,7 @@
 
 Every action is journaled and checkpointed. Requirement IDs can be traced from the spec to commits and tests, and an interrupted run can be resumed.
 
-> Status: **M1 (specs, plans and state)**. Specs and plans are written by hand and can be linted, approved, synced and traced; the agent phases arrive from M2 onwards. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: **M2 (Claude provider)**. Specs and plans are written by hand and can be linted, approved, synced and traced. The Anthropic provider (streaming, tool use, retries, usage accounting, redacted transcripts) is in place; the agent phases start with `sdd spec chat` in M3. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Install
 

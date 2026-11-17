@@ -83,7 +83,7 @@ The LLM never talks to tools directly. The orchestrator runs the agent loop:
 These limits are configurable in `sdd.yaml`:
 * Maximum agent iterations per task.
 * Maximum fix attempts per group verification.
-* Per-request and per-command timeouts.
+* Per-request (idle: no data received for that long) and per-command timeouts.
 * An optional token budget per run.
 
 Provider calls retry with exponential backoff and jitter on connection errors and on HTTP 429, 5xx and 529. When retries run out, the run checkpoints and exits with a pointer to `sdd resume`.

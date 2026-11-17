@@ -133,3 +133,30 @@ func TestAPIKeyMissing(t *testing.T) {
 		t.Fatal("expected error for missing key")
 	}
 }
+
+func TestSecretsAndProviderValidation(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "sdd.yaml"), []byte("provider:\n  name: anthropic\n  model: m\n  api_key_env: SDD_T_KEY\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, ".env"), []byte("SDD_T_KEY=sk-ant-from-dotenv\nSDD_T_DB_PASSWORD=pw-1234567\nSDD_T_REGION=us-east-1\n"), 0o644)
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets := strings.Join(cfg.Secrets(), "|")
+	if !strings.Contains(secrets, "sk-ant-from-dotenv") || !strings.Contains(secrets, "pw-1234567") || strings.Contains(secrets, "us-east-1") {
+		t.Errorf("secrets = %q", secrets)
+	}
+
+	for field, yaml := range map[string]string{
+		"provider.effort":           "provider:\n  name: anthropic\n  model: m\n  effort: extreme\n",
+		"provider.thinking_display": "provider:\n  name: anthropic\n  model: m\n  thinking_display: full\n",
+		"provider.max_tokens":       "provider:\n  name: anthropic\n  model: m\n  max_tokens: 0\n",
+		"audit.redact_patterns":     "audit:\n  redact_patterns: [\"(\"]\n",
+	} {
+		d := t.TempDir()
+		os.WriteFile(filepath.Join(d, "sdd.yaml"), []byte(yaml), 0o644)
+		if _, err := Load(d); err == nil || !strings.Contains(err.Error(), field) {
+			t.Errorf("%s: err = %v", field, err)
+		}
+	}
+}
