@@ -1,4 +1,4 @@
-module github.com/darkcarard/sdd-framework
+module github.com/darkcarard/quipu-sdd
 
 go 1.25.0
 

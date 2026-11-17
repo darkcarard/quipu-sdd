@@ -6,10 +6,10 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/implement"
-	"github.com/darkcarard/sdd-framework/internal/trace"
-	"github.com/darkcarard/sdd-framework/internal/validate"
-	"github.com/darkcarard/sdd-framework/internal/verify"
+	"github.com/darkcarard/quipu-sdd/internal/implement"
+	"github.com/darkcarard/quipu-sdd/internal/trace"
+	"github.com/darkcarard/quipu-sdd/internal/validate"
+	"github.com/darkcarard/quipu-sdd/internal/verify"
 )
 
 // Text renderings shared by the CLI and the MCP server.

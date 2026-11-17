@@ -7,7 +7,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/darkcarard/sdd-framework/internal/provider"
+	"github.com/darkcarard/quipu-sdd/internal/provider"
 )
 
 // Result is the outcome of a tool call, returned to the model as tool_result.

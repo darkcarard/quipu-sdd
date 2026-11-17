@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>sdd User Manual</title>
+<title>Quipu User Manual</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -82,6 +82,8 @@ section { display: flex; flex-direction: column; gap: 28px; scroll-margin-top: 1
 .hero { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 48px; align-items: center; }
 .hero h1 { font-size: clamp(44px, 7.5vw, 84px); font-weight: 800; letter-spacing: -0.035em; }
 .hero h1 .mono { font-family: var(--font-mono); font-weight: 500; letter-spacing: -0.04em; color: var(--agent); }
+.hero .tagline { font-family: var(--font-display); font-weight: 700; font-size: clamp(22px, 3vw, 30px); letter-spacing: -0.01em; margin-top: 10px; }
+.hero .tagline .mono { font-family: var(--font-mono); font-weight: 500; color: var(--agent); }
 .hero .lede { font-size: 19px; color: var(--muted); max-width: 46ch; margin-top: 18px; }
 .hero .lede strong { color: var(--ink); font-weight: 600; }
 .nav { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-size: 14.5px; }
@@ -242,7 +244,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 
 <div class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="#overview"><span class="mono">sdd</span> manual</a>
+    <a class="brand" href="#overview">Quipu <span class="mono">sdd</span></a>
     <nav class="tabs" role="tablist" aria-label="Manual sections">
       <a role="tab" href="#overview">Overview</a>
       <a role="tab" href="#workflow">Workflow</a>
@@ -262,8 +264,9 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
   <header class="hero">
     <div>
       <div class="eyebrow">User manual · Spec-Driven Development</div>
-      <h1 style="margin-top:14px">Build from the spec with <span class="mono">sdd</span></h1>
-      <p class="lede">Your coding agent writes the specs, the plan and the code. <strong>You approve each step.</strong> <code>sdd</code> checks everything, commits the work and keeps a record of who did what.</p>
+      <h1 style="margin-top:14px">Quipu</h1>
+      <p class="tagline">Build from the spec with <span class="mono">sdd</span></p>
+      <p class="lede">A quipu is the Inca record of knotted cords, where each knot is a fact tied to the rest. Quipu ties every requirement to its design, tasks, commits and tests. Your coding agent writes the specs, the plan and the code. <strong>You approve each step.</strong> <code>sdd</code> checks everything, commits the work and keeps a record of who did what.</p>
       <div class="cta"><a class="btn" href="#setup">Set up sdd</a><a class="btn ghost" href="#workflow">See the workflow</a></div>
     </div>
     <div class="triad" aria-label="The three roles">
@@ -277,7 +280,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
     <div class="head">
       <div class="eyebrow">What it is</div>
       <h2>One binary, four phases, no surprises</h2>
-      <p class="prose"><code>sdd</code> is a command-line tool that runs next to the coding agent you already use. Every change to your project starts as a <strong>feature</strong>: a written spec of what it must do, a technical design, a plan split into small tasks, and only then code. Each phase ends at a gate that only a person can open.</p>
+      <p class="prose">Quipu is a command-line tool, <code>sdd</code>, that runs next to the coding agent you already use. Every change to your project starts as a <strong>feature</strong>: a written spec of what it must do, a technical design, a plan split into small tasks, and only then code. Each phase ends at a gate that only a person can open.</p>
     </div>
     <div class="principles">
       <div class="principle"><h3>Uses your subscription</h3><p>The reasoning comes from Claude Code, under your own plan. <code>sdd</code> is deterministic and works offline.</p></div>
@@ -352,8 +355,8 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
       <div class="card">
         <span class="stepno">A · per machine</span>
         <h3>Install sdd</h3>
-        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>git clone https://github.com/darkcarard/sdd-framework
-<span class="p">$ </span>cd sdd-framework
+        <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>git clone https://github.com/darkcarard/quipu-sdd
+<span class="p">$ </span>cd quipu-sdd
 <span class="p">$ </span>make install
 <span class="p">$ </span>sdd version</pre></div>
         <p>It installs to <code>~/go/bin</code>. Make sure that folder is on your <code>PATH</code>.</p>
@@ -578,7 +581,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 </div>
 
   <footer>
-    <span><code>sdd</code> · Spec-Driven Development for coding agents</span>
+    <span>Quipu (<code>sdd</code>) · Spec-Driven Development for coding agents</span>
     <span>More detail: <code>docs/WORKFLOW.md</code> · <code>docs/SPEC_GUIDELINES.md</code> · <code>docs/TRACEABILITY.md</code></span>
   </footer>
 </div>

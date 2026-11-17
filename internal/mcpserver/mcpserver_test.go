@@ -12,15 +12,15 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/darkcarard/sdd-framework/internal/app"
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/templates"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/templates"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // connect starts the server for a fresh project and returns a client session

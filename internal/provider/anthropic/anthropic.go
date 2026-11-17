@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/provider"
+	"github.com/darkcarard/quipu-sdd/internal/provider"
 )
 
 // DefaultBaseURL is the Anthropic API endpoint.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/provider"
+	"github.com/darkcarard/quipu-sdd/internal/provider"
 )
 
 func TestRedact(t *testing.T) {

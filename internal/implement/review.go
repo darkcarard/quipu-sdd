@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // Review is what the user sees before approving a group.

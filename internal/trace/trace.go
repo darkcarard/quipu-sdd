@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/plan"
-	"github.com/darkcarard/sdd-framework/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/plan"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
 )
 
 // Kind is the kind of artifact an entry or link points to.

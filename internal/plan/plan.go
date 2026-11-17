@@ -9,8 +9,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/markdown"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/markdown"
 )
 
 // Plan is a parsed plan.md.

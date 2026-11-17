@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/implement"
-	"github.com/darkcarard/sdd-framework/internal/lock"
-	"github.com/darkcarard/sdd-framework/internal/validate"
-	"github.com/darkcarard/sdd-framework/internal/verify"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/implement"
+	"github.com/darkcarard/quipu-sdd/internal/lock"
+	"github.com/darkcarard/quipu-sdd/internal/validate"
+	"github.com/darkcarard/quipu-sdd/internal/verify"
 )
 
 // implementing runs fn on a fresh session of the feature, under its lock.

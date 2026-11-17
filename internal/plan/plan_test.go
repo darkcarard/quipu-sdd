@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
-	"github.com/darkcarard/sdd-framework/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
 )
 
 func functional(t *testing.T) *spec.Functional {

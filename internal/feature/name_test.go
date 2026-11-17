@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 func TestValidName(t *testing.T) {

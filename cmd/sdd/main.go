@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/darkcarard/sdd-framework/internal/cli"
+	"github.com/darkcarard/quipu-sdd/internal/cli"
 )
 
 func main() {

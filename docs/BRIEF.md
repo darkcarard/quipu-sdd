@@ -1,8 +1,8 @@
 # Project Brief
-Universal Spec-Driven Development (SDD) CLI Framework
+Quipu: Spec-Driven Development for coding agents
 
 ## 1. Project Overview
-The **Universal SDD Framework** (`sdd`) is a lightweight, language-agnostic command-line tool that drives software development from explicit, version-controlled specifications. It is installed once as a single Go binary and initialized inside each project.
+**Quipu** (command `sdd`) is a lightweight, language-agnostic command-line tool that drives software development from explicit, version-controlled specifications. It is installed once as a single Go binary and initialized inside each project.
 
 `sdd` does not call any LLM itself. The reasoning comes from the **coding agent the user already runs**, such as Claude Code, Codex CLI or Gemini CLI, under the user's existing subscription. `sdd` is the deterministic engine around that agent: it owns the artifacts, the guardrails, the approval gates, the state, the audit trail, the isolated worktree, verification and commits. The agent reaches `sdd` through a local MCP server and through commands installed into the project.
 

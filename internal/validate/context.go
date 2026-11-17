@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/spec"
-	"github.com/darkcarard/sdd-framework/internal/trace"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/trace"
 )
 
 // DeepReviewFile is where the agent writes the deep review, relative to the feature's state directory.

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 var (

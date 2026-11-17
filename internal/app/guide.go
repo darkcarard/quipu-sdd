@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/templates"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/templates"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 //go:embed guides/*.md

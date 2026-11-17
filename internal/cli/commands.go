@@ -6,9 +6,9 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/darkcarard/sdd-framework/internal/app"
-	"github.com/darkcarard/sdd-framework/internal/mcpserver"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/mcpserver"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 func (a *App) runStatus(_ context.Context, args []string) error {

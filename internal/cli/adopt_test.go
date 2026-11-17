@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // TestAdoptionThenNewFeature is the M7 exit criterion: an existing project is

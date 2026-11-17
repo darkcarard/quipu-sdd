@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 // Layout resolves every framework path inside a project root.

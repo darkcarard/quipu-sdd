@@ -6,8 +6,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/markdown"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/markdown"
 )
 
 // defRe matches an ID definition at the start of a heading or bullet, after

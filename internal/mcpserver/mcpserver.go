@@ -10,9 +10,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/darkcarard/sdd-framework/internal/app"
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/version"
+	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/version"
 )
 
 // Name is the server name agents see (tools appear as mcp__sdd__<tool> in Claude Code).

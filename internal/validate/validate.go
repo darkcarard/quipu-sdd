@@ -16,15 +16,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/spec"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/trace"
-	"github.com/darkcarard/sdd-framework/internal/verify"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/trace"
+	"github.com/darkcarard/quipu-sdd/internal/verify"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // TestRef is a `covers:` reference found in a tracked file.

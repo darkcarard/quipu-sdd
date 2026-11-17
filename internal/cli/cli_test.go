@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/state"
 )
 
 func run(t *testing.T, dir string, args ...string) (int, string, string) {

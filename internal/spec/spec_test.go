@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
 )
 
 func lintFunctional(t *testing.T, src string, opts LintOptions) (*Functional, diag.List) {

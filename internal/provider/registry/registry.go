@@ -6,10 +6,10 @@ package registry
 import (
 	"fmt"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/provider"
-	"github.com/darkcarard/sdd-framework/internal/provider/anthropic"
-	"github.com/darkcarard/sdd-framework/internal/transcript"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/provider"
+	"github.com/darkcarard/quipu-sdd/internal/provider/anthropic"
+	"github.com/darkcarard/quipu-sdd/internal/transcript"
 )
 
 // Options are the run-scoped collaborators of a provider.

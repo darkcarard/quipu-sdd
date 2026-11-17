@@ -9,14 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/markdown"
-	"github.com/darkcarard/sdd-framework/internal/spec"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/templates"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/markdown"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/templates"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
 )
 
 // Identity is who performs an action: a person (from git config

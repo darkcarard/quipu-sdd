@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/darkcarard/sdd-framework/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/state"
 )
 
 // Feature names (slugs) are used as directory names (specs/<feature>,

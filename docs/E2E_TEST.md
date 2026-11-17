@@ -7,7 +7,7 @@ A manual walkthrough of the whole workflow (specify → plan → implement → v
 - `sdd` on the `PATH`: `.mcp.json` launches it as `sdd mcp`.
 
 ```sh
-cd ~/Development/sdd-framework/sdd-framework
+cd ~/Development/quipu-sdd   # or wherever you cloned it
 git pull
 make install          # installs ~/go/bin/sdd
 which sdd && sdd version

@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/darkcarard/sdd-framework/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/app"
 )
 
 // oneFeature parses exactly one positional argument (the feature) and the flags defined on fs.

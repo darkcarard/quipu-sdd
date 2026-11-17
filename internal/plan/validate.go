@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
 )
 
 // Options configure Validate.

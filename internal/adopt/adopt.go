@@ -16,7 +16,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // Inventory describes an existing project.

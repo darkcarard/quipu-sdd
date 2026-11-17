@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
 )
 
 // runAs runs the CLI with a fixed identity and clock.

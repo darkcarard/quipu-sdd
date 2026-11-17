@@ -17,15 +17,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/journal"
-	"github.com/darkcarard/sdd-framework/internal/plan"
-	"github.com/darkcarard/sdd-framework/internal/spec"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/verify"
-	"github.com/darkcarard/sdd-framework/internal/workflow"
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/journal"
+	"github.com/darkcarard/quipu-sdd/internal/plan"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/verify"
+	"github.com/darkcarard/quipu-sdd/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // Session is one operation on a feature's implementation, run under the feature lock.

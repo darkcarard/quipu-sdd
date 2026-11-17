@@ -1,6 +1,10 @@
-# sdd: Spec-Driven Development Framework
+# Quipu
 
-`sdd` is a single-binary CLI that drives software development from approved specifications, together with the coding agent you already use (Claude Code first; Codex CLI, Gemini CLI and others later). `sdd` never calls an LLM itself: the agent does the reasoning under your existing subscription, and `sdd` owns the specs, the guardrails, the approval gates, verification, commits and the audit trail. The agent reaches it through a local MCP server and installed `/sdd-*` commands.
+**Spec-Driven Development for coding agents.**
+
+A *quipu* is the Inca record of knotted cords: each knot is a fact, and its place on the cord says how it connects to the rest. Quipu does the same for your code: every requirement is tied to its design, tasks, commits and tests, and every step is recorded.
+
+Quipu's command is `sdd`, a single-binary CLI that drives software development from approved specifications, together with the coding agent you already use (Claude Code first; Codex CLI, Gemini CLI and others later). `sdd` never calls an LLM itself: the agent does the reasoning under your existing subscription, and `sdd` owns the specs, the guardrails, the approval gates, verification, commits and the audit trail. The agent reaches it through a local MCP server and installed `/sdd-*` commands.
 
 You work in four gated phases:
 
@@ -16,7 +20,7 @@ Every action is journaled and checkpointed. Requirement IDs can be traced from t
 ## Install
 
 ```sh
-go install github.com/darkcarard/sdd-framework/cmd/sdd@latest
+go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest
 # or, from a clone:
 make install
 ```

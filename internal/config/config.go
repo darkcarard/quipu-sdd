@@ -18,7 +18,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/darkcarard/sdd-framework/internal/version"
+	"github.com/darkcarard/quipu-sdd/internal/version"
 )
 
 // FileName is the project configuration file at the repository root.

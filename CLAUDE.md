@@ -3,6 +3,8 @@
 Context for Claude Code sessions on this repository, on any machine.
 
 ## Project
+**Quipu** is the tool's name; its command is `sdd` (Spec-Driven Development, the method). Keep `sdd` for the binary, `.sdd/`, `sdd.yaml`, the `/sdd-*` commands, the `sdd` MCP server and the `SDD-*` trailers; use "Quipu" for the product in docs and prose. Repository: github.com/darkcarard/quipu-sdd.
+
 `sdd` is a single-binary Go CLI for Spec-Driven Development that runs alongside the coding agent the user already has (Claude Code first). It never calls an LLM: the agent reasons, `sdd` owns artifacts, gates, verification, commits and the audit trail. Start with these docs:
 - `docs/BRIEF.md`: goals, constraints and architecture
 - `docs/WORKFLOW.md`: the four gated phases (specify → plan → implement → validate), the state machine and the commands
@@ -41,7 +43,7 @@ Update this section whenever a milestone is completed.
 - All docs, templates, code comments and CLI messages are in **English**. The user converses in **Spanish**.
 - Follow `internal/templates/profiles/go.md`: gofmt, table-driven tests, `t.TempDir()`, wrapped errors, `context.Context` first.
 - When a change affects behavior described in `docs/`, update the docs in the same commit.
-- Commit once per milestone (or per coherent step), then push to `origin` (github.com/darkcarard/sdd-framework). The user works from several machines.
+- Commit once per milestone (or per coherent step), then push to `origin` (github.com/darkcarard/quipu-sdd). The user works from several machines.
 
 ## Commands
 ```sh

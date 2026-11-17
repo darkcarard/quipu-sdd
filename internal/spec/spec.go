@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/markdown"
+	"github.com/darkcarard/quipu-sdd/internal/markdown"
 )
 
 // ID patterns (three-digit, never renumbered).

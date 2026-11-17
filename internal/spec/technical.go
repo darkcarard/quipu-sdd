@@ -3,8 +3,8 @@ package spec
 import (
 	"strings"
 
-	"github.com/darkcarard/sdd-framework/internal/diag"
-	"github.com/darkcarard/sdd-framework/internal/markdown"
+	"github.com/darkcarard/quipu-sdd/internal/diag"
+	"github.com/darkcarard/quipu-sdd/internal/markdown"
 )
 
 const (

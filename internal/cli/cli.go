@@ -15,13 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/darkcarard/sdd-framework/internal/agents"
-	"github.com/darkcarard/sdd-framework/internal/app"
-	"github.com/darkcarard/sdd-framework/internal/config"
-	"github.com/darkcarard/sdd-framework/internal/feature"
-	"github.com/darkcarard/sdd-framework/internal/state"
-	"github.com/darkcarard/sdd-framework/internal/templates"
-	"github.com/darkcarard/sdd-framework/internal/version"
+	"github.com/darkcarard/quipu-sdd/internal/agents"
+	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/state"
+	"github.com/darkcarard/quipu-sdd/internal/templates"
+	"github.com/darkcarard/quipu-sdd/internal/version"
 )
 
 // Exit codes.

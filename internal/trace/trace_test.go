@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/plan"
-	"github.com/darkcarard/sdd-framework/internal/sddtest"
-	"github.com/darkcarard/sdd-framework/internal/spec"
+	"github.com/darkcarard/quipu-sdd/internal/plan"
+	"github.com/darkcarard/quipu-sdd/internal/sddtest"
+	"github.com/darkcarard/quipu-sdd/internal/spec"
 )
 
 func index(t *testing.T, technical string) *Index {

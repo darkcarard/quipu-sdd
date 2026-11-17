@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/darkcarard/sdd-framework/internal/workspace"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 func write(t *testing.T, root string, files map[string]string) {

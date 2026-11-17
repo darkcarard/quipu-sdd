@@ -1,5 +1,5 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -X github.com/darkcarard/sdd-framework/internal/version.Version=$(VERSION)
+LDFLAGS := -X github.com/darkcarard/quipu-sdd/internal/version.Version=$(VERSION)
 
 .PHONY: build install test vet fmt check clean live-test
 
