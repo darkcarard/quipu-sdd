@@ -1,16 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Quipu">
-  <style>
-    .loop { fill: none; stroke: #0b7a6e; }
-    .tail { stroke: #15211f; }
-    .knot { fill: #0b7a6e; }
-    @media (prefers-color-scheme: dark) {
-      .loop { stroke: #4cc4b2; }
-      .tail { stroke: #e6efec; }
-      .knot { fill: #4cc4b2; }
-    }
-  </style>
-  <circle class="loop" cx="29" cy="28" r="18" stroke-width="7"/>
-  <path class="tail" d="M40 41 L55 59" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="44.5" cy="46.5" r="5.2" fill="#d4820f"/>
-  <circle class="knot" cx="51.5" cy="54.8" r="5.2"/>
+  <!-- One teal cord (the Q) with two knots: amber for the human gate, teal for a recorded fact.
+       Fixed mid-tone colors that read on light and dark backgrounds alike. -->
+  <circle cx="29" cy="27" r="18" fill="none" stroke="#14a090" stroke-width="7"/>
+  <path d="M40 40 L57 60" fill="none" stroke="#14a090" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="45" cy="45.9" r="5.4" fill="#e08a12"/>
+  <circle cx="52" cy="54.1" r="5.4" fill="#14a090"/>
 </svg>

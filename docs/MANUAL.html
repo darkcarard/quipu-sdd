@@ -85,7 +85,6 @@ section { display: flex; flex-direction: column; gap: 28px; scroll-margin-top: 1
 .hero h1 .mono { font-family: var(--font-mono); font-weight: 500; letter-spacing: -0.04em; color: var(--agent); }
 .mark { display: inline-block; flex: none; }
 .mark .m-loop { fill: none; stroke: var(--agent); }
-.mark .m-tail { stroke: var(--ink); }
 .mark .m-gate { fill: #d4820f; }
 .mark .m-knot { fill: var(--agent); }
 .brand { display: inline-flex; align-items: center; gap: 8px; }
@@ -254,7 +253,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
 
 <div class="topbar">
   <div class="topbar-in">
-    <a class="brand" href="#overview"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle class="m-loop" cx="29" cy="28" r="18" stroke-width="7"/><path class="m-tail" d="M40 41 L55 59" stroke-width="6" stroke-linecap="round"/><circle class="m-gate" cx="44.5" cy="46.5" r="5.2"/><circle class="m-knot" cx="51.5" cy="54.8" r="5.2"/></svg> Quipu <span class="mono">sdd</span></a>
+    <a class="brand" href="#overview"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle class="m-loop" cx="29" cy="27" r="18" stroke-width="7"/><path class="m-loop" d="M40 40 L57 60" stroke-width="6" stroke-linecap="round"/><circle class="m-gate" cx="45" cy="45.9" r="5.4"/><circle class="m-knot" cx="52" cy="54.1" r="5.4"/></svg> Quipu <span class="mono">sdd</span></a>
     <nav class="tabs" role="tablist" aria-label="Manual sections">
       <a role="tab" href="#overview">Overview</a>
       <a role="tab" href="#workflow">Workflow</a>
@@ -274,7 +273,7 @@ footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--mute
   <header class="hero">
     <div>
       <div class="eyebrow">User manual · Spec-Driven Development</div>
-      <h1 class="logo-h1" style="margin-top:14px"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle class="m-loop" cx="29" cy="28" r="18" stroke-width="7"/><path class="m-tail" d="M40 41 L55 59" stroke-width="6" stroke-linecap="round"/><circle class="m-gate" cx="44.5" cy="46.5" r="5.2"/><circle class="m-knot" cx="51.5" cy="54.8" r="5.2"/></svg><span>Quipu</span></h1>
+      <h1 class="logo-h1" style="margin-top:14px"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><circle class="m-loop" cx="29" cy="27" r="18" stroke-width="7"/><path class="m-loop" d="M40 40 L57 60" stroke-width="6" stroke-linecap="round"/><circle class="m-gate" cx="45" cy="45.9" r="5.4"/><circle class="m-knot" cx="52" cy="54.1" r="5.4"/></svg><span>Quipu</span></h1>
       <p class="tagline">Build from the spec with <span class="mono">sdd</span></p>
       <p class="lede">A quipu is the Inca record of knotted cords, where each knot is a fact tied to the rest. Quipu ties every requirement to its design, tasks, commits and tests. Your coding agent writes the specs, the plan and the code. <strong>You approve each step.</strong> <code>sdd</code> checks everything, commits the work and keeps a record of who did what.</p>
       <div class="cta"><a class="btn" href="#setup">Set up sdd</a><a class="btn ghost" href="#workflow">See the workflow</a></div>
