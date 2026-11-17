@@ -1,0 +1,256 @@
+// Package config loads the project configuration (sdd.yaml) and resolves
+// environment values from the process environment and an optional .env file.
+//
+// Precedence for every value that can come from the environment:
+// process environment > .env file > sdd.yaml > built-in defaults.
+package config
+
+import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/darkcarard/sdd-framework/internal/version"
+)
+
+// FileName is the project configuration file at the repository root.
+const FileName = "sdd.yaml"
+
+// DotEnvFile is the optional, git-ignored file holding secrets such as API keys.
+const DotEnvFile = ".env"
+
+// Environment variables that override sdd.yaml.
+const (
+	EnvProvider = "SDD_PROVIDER"
+	EnvModel    = "SDD_MODEL"
+)
+
+// Config is the content of sdd.yaml.
+type Config struct {
+	FrameworkVersion int         `yaml:"framework_version"`
+	Provider         Provider    `yaml:"provider"`
+	Limits           Limits      `yaml:"limits"`
+	MCPServers       []MCPServer `yaml:"mcp_servers"`
+	Audit            Audit       `yaml:"audit"`
+
+	// env is the merged view of .env and the process environment (not serialized).
+	env map[string]string
+}
+
+// Provider selects the LLM backend.
+type Provider struct {
+	Name      string `yaml:"name"`        // anthropic | gemini | openai
+	Model     string `yaml:"model"`       // provider-specific model id
+	APIKeyEnv string `yaml:"api_key_env"` // name of the env var holding the key (never the key itself)
+	MaxTokens int    `yaml:"max_tokens"`  // max output tokens per request
+}
+
+// Limits bound the agent loops. See docs/BRIEF.md §4.
+type Limits struct {
+	MaxIterationsPerTask int           `yaml:"max_iterations_per_task"`
+	MaxFixAttempts       int           `yaml:"max_fix_attempts"`
+	MaxFilesPerTask      int           `yaml:"max_files_per_task"`
+	MaxRetries           int           `yaml:"max_retries"`
+	RequestTimeout       time.Duration `yaml:"request_timeout"`
+	CommandTimeout       time.Duration `yaml:"command_timeout"`
+	TokenBudget          int           `yaml:"token_budget"` // 0 = unlimited
+}
+
+// MCPServer is an MCP server spawned over stdio. Only tools listed in AllowTools
+// are exposed to the agent; an empty list exposes none.
+type MCPServer struct {
+	Name       string            `yaml:"name"`
+	Command    string            `yaml:"command"`
+	Args       []string          `yaml:"args"`
+	Env        map[string]string `yaml:"env"`
+	AllowTools []string          `yaml:"allow_tools"`
+}
+
+// Audit controls what is persisted for traceability.
+type Audit struct {
+	CommitTranscripts bool `yaml:"commit_transcripts"`
+}
+
+// Default returns the built-in configuration.
+func Default() Config {
+	return Config{
+		FrameworkVersion: version.LayoutVersion,
+		Provider: Provider{
+			Name:      "anthropic",
+			Model:     "claude-opus-5-5",
+			APIKeyEnv: "ANTHROPIC_API_KEY",
+			MaxTokens: 16000,
+		},
+		Limits: Limits{
+			MaxIterationsPerTask: 30,
+			MaxFixAttempts:       3,
+			MaxFilesPerTask:      5,
+			MaxRetries:           5,
+			RequestTimeout:       5 * time.Minute,
+			CommandTimeout:       10 * time.Minute,
+		},
+		MCPServers: []MCPServer{},
+	}
+}
+
+// DefaultYAML is the commented sdd.yaml written by `sdd init`. It must decode to Default().
+func DefaultYAML() string {
+	return fmt.Sprintf(`# SDD framework project configuration. See docs/BRIEF.md.
+# Secrets (API keys) never go here: set them in the environment or in .env.
+framework_version: %d
+
+provider:
+  name: anthropic             # anthropic | gemini | openai
+  model: claude-opus-5-5
+  api_key_env: ANTHROPIC_API_KEY
+  max_tokens: 16000
+
+limits:
+  max_iterations_per_task: 30 # agent turns per task
+  max_fix_attempts: 3         # verification fix loops per group
+  max_files_per_task: 5       # plan validation: keeps tasks reviewable
+  max_retries: 5              # provider retries (429/5xx/529/network)
+  request_timeout: 5m
+  command_timeout: 10m
+  token_budget: 0             # per run; 0 = unlimited
+
+# MCP servers spawned over stdio. Only allow_tools are exposed to the agent.
+mcp_servers: []
+#  - name: filesystem
+#    command: npx
+#    args: ["-y", "@modelcontextprotocol/server-filesystem", "."]
+#    allow_tools: [read_file, write_file, list_directory]
+
+audit:
+  commit_transcripts: false   # .sdd/runs/ is git-ignored unless true
+`, version.LayoutVersion)
+}
+
+// Load reads <root>/sdd.yaml (missing fields keep their defaults), merges
+// <root>/.env with the process environment and applies environment overrides.
+func Load(root string) (Config, error) {
+	cfg := Default()
+	b, err := os.ReadFile(filepath.Join(root, FileName))
+	if err != nil {
+		return cfg, fmt.Errorf("reading %s (run `sdd init` first?): %w", FileName, err)
+	}
+	if err := yaml.Unmarshal(b, &cfg); err != nil {
+		return cfg, fmt.Errorf("parsing %s: %w", FileName, err)
+	}
+	if cfg.FrameworkVersion > version.LayoutVersion {
+		return cfg, fmt.Errorf("%s requires framework layout v%d but this binary supports v%d: upgrade sdd",
+			FileName, cfg.FrameworkVersion, version.LayoutVersion)
+	}
+
+	env, err := loadEnv(root)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.env = env
+	if v := env[EnvProvider]; v != "" {
+		cfg.Provider.Name = v
+	}
+	if v := env[EnvModel]; v != "" {
+		cfg.Provider.Model = v
+	}
+	return cfg, cfg.Validate()
+}
+
+// Validate checks values that would otherwise fail later in confusing ways.
+func (c Config) Validate() error {
+	var errs []error
+	switch c.Provider.Name {
+	case "anthropic", "gemini", "openai":
+	default:
+		errs = append(errs, fmt.Errorf("provider.name: unsupported provider %q", c.Provider.Name))
+	}
+	if c.Provider.Model == "" {
+		errs = append(errs, errors.New("provider.model: required"))
+	}
+	if c.Limits.MaxFilesPerTask < 1 {
+		errs = append(errs, errors.New("limits.max_files_per_task: must be >= 1"))
+	}
+	for i, s := range c.MCPServers {
+		if s.Name == "" || s.Command == "" {
+			errs = append(errs, fmt.Errorf("mcp_servers[%d]: name and command are required", i))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// Lookup returns an environment value with precedence process env > .env.
+func (c Config) Lookup(key string) (string, bool) {
+	if v, ok := os.LookupEnv(key); ok {
+		return v, true
+	}
+	v, ok := c.env[key]
+	return v, ok
+}
+
+// APIKey returns the provider API key from the environment or .env.
+func (c Config) APIKey() (string, error) {
+	if v, ok := c.Lookup(c.Provider.APIKeyEnv); ok && v != "" {
+		return v, nil
+	}
+	return "", fmt.Errorf("%s is not set: export it or add it to %s", c.Provider.APIKeyEnv, DotEnvFile)
+}
+
+// loadEnv merges <root>/.env with the process environment (process wins).
+func loadEnv(root string) (map[string]string, error) {
+	env := map[string]string{}
+	b, err := os.ReadFile(filepath.Join(root, DotEnvFile))
+	switch {
+	case err == nil:
+		if env, err = ParseDotEnv(string(b)); err != nil {
+			return nil, fmt.Errorf("%s: %w", DotEnvFile, err)
+		}
+	case !errors.Is(err, fs.ErrNotExist):
+		return nil, err
+	}
+	for _, kv := range os.Environ() {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			env[k] = v
+		}
+	}
+	return env, nil
+}
+
+// ParseDotEnv parses KEY=VALUE lines. It supports blank lines, # comments, an
+// optional `export ` prefix, single/double-quoted values and trailing ` #` comments
+// on unquoted values. Variable expansion is intentionally not supported.
+func ParseDotEnv(content string) (map[string]string, error) {
+	out := map[string]string{}
+	for i, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(strings.TrimSuffix(raw, "\r"))
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		key, val, ok := strings.Cut(line, "=")
+		key = strings.TrimSpace(key)
+		if !ok || key == "" || strings.ContainsAny(key, " \t") {
+			return nil, fmt.Errorf("line %d: expected KEY=VALUE", i+1)
+		}
+		val = strings.TrimSpace(val)
+		switch {
+		case len(val) >= 2 && (val[0] == '"' || val[0] == '\''):
+			end := strings.IndexByte(val[1:], val[0])
+			if end < 0 {
+				return nil, fmt.Errorf("line %d: unterminated quote", i+1)
+			}
+			val = val[1 : end+1]
+		default:
+			if idx := strings.Index(val, " #"); idx >= 0 {
+				val = strings.TrimSpace(val[:idx])
+			}
+		}
+		out[key] = val
+	}
+	return out, nil
+}
