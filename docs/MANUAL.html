@@ -378,7 +378,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
         <h3>Install sdd</h3>
         <div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest
 <span class="p">$ </span>sdd version</pre></div>
-        <p>It installs to <code>~/go/bin</code>. Make sure that folder is on your <code>PATH</code>. You can also clone the repository and run <code>make install</code>.</p>
+        <p>It installs to <code>~/go/bin</code>. Make sure that folder is on your <code>PATH</code>. You can also clone the repository and run <code>make install</code>. To update, run the same command, then <code>sdd init --agent <span class="ag-id">claude</span></code> again in each project: it adds the files that are new in that release and leaves yours alone.</p>
       </div>
       <div class="card">
         <span class="stepno">B · per project</span>

@@ -46,6 +46,7 @@ Update this section whenever a milestone is completed.
 - Follow `internal/templates/profiles/go.md`: gofmt, table-driven tests, `t.TempDir()`, wrapped errors, `context.Context` first.
 - When a change affects behavior described in `docs/`, update the docs in the same commit.
 - Commit once per milestone (or per coherent step), then push to `origin` (github.com/darkcarard/quipu-sdd). The user works from several machines.
+- Releases: users get what `go install …/cmd/sdd@latest` resolves to, the latest semver tag, so pushed changes reach them only with a new tag. To release: add the version to `CHANGELOG.md` (with "Upgrading a project" notes when integration files change), commit, `git tag -a vX.Y.Z -m "Quipu vX.Y.Z …"`, push the tag, and `gh release create vX.Y.Z` with the changelog entry. Before 1.0, new features bump the minor version.
 - The repository is public (since 2026-11-17) under Apache-2.0 (`LICENSE`, `NOTICE`, copyright darkcarard), with `SECURITY.md` and `CONTRIBUTING.md`. `main` is protected: if a direct push is refused, push a branch and open a pull request with `gh pr create`. The manual is served by GitHub Pages from `docs/` (`docs/index.html` redirects by browser language; `docs/.nojekyll`).
 
 ## Commands

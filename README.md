@@ -29,6 +29,8 @@ make install
 
 This repository is the only official source of Quipu (see [SECURITY.md](SECURITY.md)). It needs Go 1.25 and git.
 
+**Updating.** Run the same `go install …@latest` and check `sdd version`. Then, in each project, run `sdd init --agent <your agents>` again: it adds the files that are new in that release (skills, subagents) and never touches the ones you have. A file that changed in the release is reported as kept; delete it and run `sdd init` again to get the new version (`sdd init --check` lists what is missing). What changed in each release is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Use in a project
 
 ```sh
