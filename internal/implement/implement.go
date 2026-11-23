@@ -658,7 +658,7 @@ func GroupVerify(ctx context.Context, s *Session) (Verified, error) {
 	}
 	_ = s.record(journal.Event{Action: "group.committed", Status: journal.Info, IDs: append([]string{g.ID}, tasks...),
 		Detail: short(sha) + " " + out.Subject})
-	out.Next = fmt.Sprintf("stop: %s is committed and awaits the user's review; ask the user to run `sdd review %s`", g.ID, g.ID)
+	out.Next = fmt.Sprintf("stop: %s is committed and awaits the user's review; ask the user to run `sdd review %s` (optionally %s first, for an expert review)", g.ID, g.ID, feature.Skill("sdd-review", g.ID))
 	return out, s.save()
 }
 

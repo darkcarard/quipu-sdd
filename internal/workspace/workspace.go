@@ -198,18 +198,75 @@ func (w *Worktree) Squash(ctx context.Context, base, message string) (string, er
 
 // DiffStat summarizes the changes from base to the working tree.
 func (w *Worktree) DiffStat(ctx context.Context, base string) (string, error) {
-	if _, err := w.git.Run(ctx, "add", "--all", "--intent-to-add"); err != nil {
-		return "", err
-	}
-	return w.git.Run(ctx, "diff", "--stat", base)
+	return w.diff(ctx, base, "", "--stat")
 }
 
 // Diff returns the full diff from base to the working tree.
 func (w *Worktree) Diff(ctx context.Context, base string) (string, error) {
-	if _, err := w.git.Run(ctx, "add", "--all", "--intent-to-add"); err != nil {
-		return "", err
+	return w.diff(ctx, base, "")
+}
+
+// DiffStatRange summarizes the changes from base to head; an empty head means
+// the working tree.
+func (w *Worktree) DiffStatRange(ctx context.Context, base, head string) (string, error) {
+	return w.diff(ctx, base, head, "--stat")
+}
+
+// DiffRange returns the full diff from base to head; an empty head means the
+// working tree.
+func (w *Worktree) DiffRange(ctx context.Context, base, head string) (string, error) {
+	return w.diff(ctx, base, head)
+}
+
+func (w *Worktree) diff(ctx context.Context, base, head string, flags ...string) (string, error) {
+	args := append([]string{"diff"}, flags...)
+	args = append(args, base)
+	if head == "" {
+		// Make new files visible to the diff without staging their content.
+		if _, err := w.git.Run(ctx, "add", "--all", "--intent-to-add"); err != nil {
+			return "", err
+		}
+	} else {
+		args = append(args, head)
 	}
-	return w.git.Run(ctx, "diff", base)
+	return w.git.Run(ctx, args...)
+}
+
+// Change is one file changed between two revisions.
+type Change struct {
+	Status byte // 'A' added, 'D' deleted, 'M' modified (or any other git status letter)
+	Path   string
+}
+
+// Changes lists the files changed from base to head (an empty head means the
+// working tree), without rename detection.
+func (w *Worktree) Changes(ctx context.Context, base, head string) ([]Change, error) {
+	out, err := w.diff(ctx, base, head, "--name-status", "--no-renames", "-z")
+	if err != nil {
+		return nil, err
+	}
+	fields := strings.Split(strings.TrimRight(out, "\x00"), "\x00")
+	var changes []Change
+	for i := 0; i+1 < len(fields); i += 2 {
+		if fields[i] == "" {
+			continue
+		}
+		changes = append(changes, Change{Status: fields[i][0], Path: fields[i+1]})
+	}
+	return changes, nil
+}
+
+// FileAt returns the content of path (relative to the worktree root) at rev.
+func (w *Worktree) FileAt(ctx context.Context, rev, path string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", "show", rev+":"+filepath.ToSlash(path))
+	cmd.Dir = w.Dir
+	var errb bytes.Buffer
+	cmd.Stderr = &errb
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git show %s:%s: %s: %w", rev, path, strings.TrimSpace(errb.String()), err)
+	}
+	return out, nil
 }
 
 // Reset discards every uncommitted change and moves the branch to sha.

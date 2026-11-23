@@ -40,6 +40,7 @@ type Config struct {
 	Limits           Limits      `yaml:"limits"`
 	MCPServers       []MCPServer `yaml:"mcp_servers"`
 	Audit            Audit       `yaml:"audit"`
+	Review           Review      `yaml:"review"`
 
 	// env is the merged view of .env and the process environment (not serialized).
 	env map[string]string
@@ -85,6 +86,23 @@ type MCPServer struct {
 	AllowTools []string          `yaml:"allow_tools"`
 }
 
+// Review configures how `sdd review` shows a group's changes.
+type Review struct {
+	// Editor is a VS Code-compatible command (code, codium, cursor, windsurf)
+	// that opens each changed file side by side with `--diff`. Empty detects
+	// one; "none" prints the diff in the terminal. The SDD_REVIEW_EDITOR
+	// environment variable (or .env entry) overrides it per machine.
+	Editor string `yaml:"editor"`
+}
+
+// ReviewEditor returns the configured diff editor, SDD_REVIEW_EDITOR first.
+func (c Config) ReviewEditor() string {
+	if v, ok := c.Lookup("SDD_REVIEW_EDITOR"); ok && strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v)
+	}
+	return strings.TrimSpace(c.Review.Editor)
+}
+
 // Audit controls what is persisted for traceability.
 type Audit struct {
 	CommitTranscripts bool `yaml:"commit_transcripts"`
@@ -121,6 +139,9 @@ limits:
   max_fix_attempts: 3         # group verification failures before the group is marked failed
   command_timeout: 10m        # build, lint and test commands are killed after this long
   output_tail: 6000           # characters of a failing command's output returned to the agent
+
+review:
+  editor: ""                  # sdd review opens diffs side by side here (code, codium, cursor...); "" detects one, "none" prints them
 `, version.LayoutVersion)
 }
 

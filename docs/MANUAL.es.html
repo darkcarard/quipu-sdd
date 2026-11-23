@@ -462,11 +462,12 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
         <div class="n">4</div>
         <div class="body">
           <h3>Implementa, un grupo a la vez</h3>
-          <p>Tú inicias la implementación; <code>sdd</code> crea un worktree aislado en la rama <code>sdd/&lt;f&gt;</code>. El agente avanza por el grupo y se detiene cuando está listo para tu revisión. Apruébalo para continuar o devuélvelo con comentarios.</p>
+          <p>Tú inicias la implementación; <code>sdd</code> crea un worktree aislado en la rama <code>sdd/&lt;f&gt;</code>. El agente avanza por el grupo y se detiene cuando está listo para tu revisión. <code>sdd review</code> abre cada archivo cambiado lado a lado en tu editor (VS Code, VSCodium, Cursor; si no hay ninguno, imprime el diff), y antes el skill <code><span class="sk">/</span>sdd-review</code> puede pedirle a un revisor que compruebe el grupo contra los criterios, el perfil del lenguaje y las reglas de tu proyecto. Apruébalo para continuar o devuélvelo con comentarios.</p>
           <div class="pair">
             <div><span class="tag you">en tu terminal</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
               <span class="tag agent" style="margin-top:14px">en <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-implement &lt;f&gt;</pre></div></div>
-            <div><span class="tag you">en tu terminal, por grupo</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># --diff para ver el diff completo</span>
+            <div><span class="tag agent">en <span class="ag">Claude Code</span> · opcional</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-review G1      <span class="c"># revisión experta, escribe un reporte</span></pre></div>
+              <span class="tag you" style="margin-top:14px">en tu terminal, por grupo</span><div class="code"><button class="copy" type="button">Copiar</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># lado a lado en tu editor</span>
 <span class="p">$ </span>sdd approve G1
 <span class="c"># o devuélvelo:</span>
 <span class="p">$ </span>sdd revise G1 -m <span class="s">"Maneja el caso del archivo vacío"</span></pre></div></div>
@@ -482,6 +483,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
             <div class="flow">
               <span class="chip agent">group_verify</span><span class="arrow">→</span>
               <span class="chip sdd">un commit con trailers SDD</span><span class="arrow">→</span>
+              <span class="chip agent">sdd-review (opcional)</span><span class="arrow">→</span>
               <span class="chip you">sdd review</span><span class="arrow">→</span>
               <span class="chip you">approve</span><span class="arrow">o</span><span class="chip you">revise</span><span class="arrow">→</span>
               <span class="chip agent"><span class="sk">/</span>sdd-implement</span>
@@ -552,7 +554,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
 │  │  └─ report.md
 │  └─ worktrees/         <span class="y"># solo local</span>
 ├─ .mcp.json
-└─ .claude/  skills/ settings.json</div>
+└─ .claude/  skills/ agents/ settings.json</div>
     </div>
   </section>
 
@@ -573,7 +575,8 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
           <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Congela el plan.</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Crea el worktree e inicia el primer grupo.</td></tr>
           <tr><td><code><span class="sk">/</span>sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agente</span></td><td>Avanza por el grupo actual hasta dejarlo listo para revisión.</td></tr>
-          <tr><td><code>sdd review G1 [--diff]</code></td><td class="who"><span class="tag you">tú</span></td><td>Resumen del grupo que espera revisión. Acepta el ID del grupo, una feature, o nada cuando solo una feature se está implementando.</td></tr>
+          <tr><td><code><span class="sk">/</span>sdd-review G1</code></td><td class="who"><span class="tag agent">agente</span></td><td>Revisión experta opcional del grupo (criterios, perfil del lenguaje, reglas del proyecto); escribe un reporte.</td></tr>
+          <tr><td><code>sdd review G1 [--diff|--no-open]</code></td><td class="who"><span class="tag you">tú</span></td><td>El grupo que espera revisión, con sus cambios lado a lado en tu editor (o impresos si no hay ninguno). Acepta el ID del grupo, una feature, o nada cuando solo una feature se está implementando.</td></tr>
           <tr><td><code>sdd approve G1</code> · <code>sdd revise G1 -m "…"</code></td><td class="who"><span class="tag you">tú</span></td><td>Acepta el grupo o lo devuelve con comentarios.</td></tr>
           <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">tú</span></td><td>Pruebas de integración, todas las verificaciones y <code>report.md</code>.</td></tr>
           <tr><td><code>sdd merge [&lt;f&gt;]</code></td><td class="who"><span class="tag you">tú</span></td><td>Integra una feature validada en tu rama, elimina su worktree y hace commit de sus registros.</td></tr>

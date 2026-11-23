@@ -283,6 +283,14 @@ func TestImplementationThroughMCP(t *testing.T) {
 	if out, _ := call(t, cs, "task_next", map[string]any{"feature": "user-signup"}); !strings.Contains(out, "G1 awaits the user's review: stop") {
 		t.Errorf("review gate: %s", out)
 	}
+	for _, args := range []map[string]any{{"group": "G1"}, {"feature": "user-signup", "group": "g1"}, nil} {
+		if out, isErr := call(t, cs, "review_context", args); isErr || !strings.Contains(out, "# Group review: user-signup G1") || !strings.Contains(out, "`sdd approve G1`") {
+			t.Errorf("review_context %v: %v %s", args, isErr, out)
+		}
+	}
+	if out, isErr := call(t, cs, "review_context", map[string]any{"feature": "user-signup", "group": "G2"}); !isErr || !strings.Contains(out, "current group is G1") {
+		t.Errorf("review_context of a group that is not current: %v %s", isErr, out)
+	}
 	events, _ := journal.Read(a.Layout.JournalFile("user-signup"))
 	agentEvents := 0
 	for _, ev := range events {

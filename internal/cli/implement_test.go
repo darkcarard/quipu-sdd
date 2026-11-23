@@ -77,6 +77,14 @@ func TestImplementWorkflowCLI(t *testing.T) {
 		"G1   awaiting-review  1/1 tasks  Domain model", "Next: review G1 with `sdd review G1`")
 	contains(t, mustRun(t, dir, ExitOK, "review", "g1", "--diff"),
 		"Group G1: Domain model  [awaiting-review]", "agent: User entity", "internal/signup/user.go", "test:       passed")
+	// Without an editor (SDD_REVIEW_EDITOR=none in TestMain) the diff is printed.
+	contains(t, mustRun(t, dir, ExitOK, "review"), "Showing the diff here: review.editor is none", "+++ b/internal/signup/user.go",
+		"`/sdd-review G1` in your agent")
+	contains(t, mustRun(t, dir, ExitOK, "review", "G1", "--no-open"), "Group G1: Domain model")
+	os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte("# Rules\n"), 0o644)
+	contains(t, mustRun(t, dir, ExitOK, "review", "G1", "--context"), "# Group review: user-signup G1 (Domain model)",
+		"covers AC-001 (FR-001)", "Review as a senior go engineer", "Project guardrails: CLAUDE.md", ".sdd/features/user-signup/reviews/G1.md", "`sdd approve G1`")
+	mustRun(t, dir, ExitUsage, "review", "G1", "--context", "--diff")
 	contains(t, mustRun(t, dir, ExitError, "approve", "G2"), "no feature being implemented has G2 as its current group")
 	contains(t, mustRun(t, dir, ExitError, "revise", "G1"), "feedback is required")
 	contains(t, mustRun(t, dir, ExitOK, "revise", "G1", "-m", "Add a doc comment"), "G1 is back in progress", "`/sdd-implement user-signup` in your agent (`$sdd-implement` in Codex)")

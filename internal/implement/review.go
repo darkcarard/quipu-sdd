@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/darkcarard/quipu-sdd/internal/feature"
 	"github.com/darkcarard/quipu-sdd/internal/journal"
 	"github.com/darkcarard/quipu-sdd/internal/state"
 	"github.com/darkcarard/quipu-sdd/internal/workflow"
@@ -16,6 +17,7 @@ import (
 type Review struct {
 	Group    GroupView
 	Worktree string // absolute path
+	Base     string // the commit the group started from; its changes are Base..worktree
 	DiffStat string
 	Diff     string // only when requested
 	Next     string
@@ -41,7 +43,7 @@ func ReviewGroup(ctx context.Context, s *Session, withDiff bool) (Review, error)
 	if err != nil {
 		return Review{}, err
 	}
-	out := Review{Group: s.view(g), Worktree: wt.Dir}
+	out := Review{Group: s.view(g), Worktree: wt.Dir, Base: g.BaseSHA}
 	if out.DiffStat, err = wt.DiffStat(ctx, g.BaseSHA); err != nil {
 		return out, err
 	}
@@ -52,7 +54,7 @@ func ReviewGroup(ctx context.Context, s *Session, withDiff bool) (Review, error)
 	}
 	switch g.Status {
 	case workflow.GroupAwaitingReview:
-		out.Next = fmt.Sprintf("`sdd approve %s` to accept it, or `sdd revise %s -m \"<what to change>\"`", g.ID, g.ID)
+		out.Next = fmt.Sprintf("`sdd approve %s` to accept it, or `sdd revise %s -m \"<what to change>\"`; for an expert review first: %s", g.ID, g.ID, feature.Skill("sdd-review", g.ID))
 	case workflow.GroupFailed:
 		out.Next = fmt.Sprintf("%s failed verification: give the agent guidance with `sdd revise %s -m \"<guidance>\"`", g.ID, g.ID)
 	default:

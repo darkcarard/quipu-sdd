@@ -12,7 +12,7 @@ The user starts the implementation with `sdd implement <feature>`, which creates
 2. Implement the task in the worktree, with unit tests that reference the criteria they verify (`covers: AC-###` in a comment or the test name). Run the tests yourself as you go.
 3. Call `task_done` with a one-line summary. sdd runs the build; if it fails, fix it and call `task_done` again. When it passes, sdd commits a checkpoint.
 4. Repeat from 1. When `task_next` asks for it, call `group_verify`: sdd runs build, lint and test. Fix failures and call it again; after the configured number of failures the group is marked failed and you must stop.
-5. When `group_verify` passes, sdd squashes the group into one commit and the group waits for the user's review. **Stop** and ask the user to run `sdd review G<n>`; they approve (`sdd approve G<n>`) or send feedback (`sdd revise G<n>`). Do not start the next group yourself before they do.
+5. When `group_verify` passes, sdd squashes the group into one commit and the group waits for the user's review. **Stop** and ask the user to run `sdd review G<n>` (optionally the `sdd-review` skill first, for an expert review); they approve (`sdd approve G<n>`) or send feedback (`sdd revise G<n>`). Do not start the next group yourself before they do.
 
 ## Rules
 

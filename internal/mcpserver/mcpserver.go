@@ -135,10 +135,13 @@ func New(a *app.App) *mcp.Server {
 	})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "review_context",
-		Description: "Validation: brief for a deep review of an implemented feature (criteria with their tasks, commits and tests). Informational only.",
+		Description: "Review brief. With group (or no arguments): expert review of that group (changes, covered criteria, profile, guardrails). With only feature: deep review of the implemented feature. Informational only.",
 		Annotations: readOnly,
-	}, func(ctx context.Context, req *mcp.CallToolRequest, in requiredFeatureArg) (*mcp.CallToolResult, any, error) {
-		return text(a.ReviewContext(ctx, in.Feature))
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in reviewArgs) (*mcp.CallToolResult, any, error) {
+		if in.Group == "" && in.Feature != "" {
+			return text(a.ReviewContext(ctx, in.Feature))
+		}
+		return text(a.GroupReviewBrief(ctx, in.Feature, in.Group))
 	})
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "adopt_context",
@@ -153,6 +156,11 @@ func New(a *app.App) *mcp.Server {
 type taskDoneArgs struct {
 	Feature string `json:"feature" jsonschema:"feature name or title"`
 	Summary string `json:"summary,omitempty" jsonschema:"one line on what changed (shown in the review)"`
+}
+
+type reviewArgs struct {
+	Feature string `json:"feature,omitempty" jsonschema:"feature name or title"`
+	Group   string `json:"group,omitempty" jsonschema:"group ID (G2); with no feature, the feature whose current group it is"`
 }
 
 type featureArg struct {

@@ -53,7 +53,8 @@ sdd init --agent claude   # sdd.yaml, specs/, .sdd/ and your agent's setup:
 /sdd-plan user-signup                  # then the plan (approve each one as above)
 ! sdd implement user-signup            # creates the worktree .sdd/worktrees/user-signup
 /sdd-implement user-signup             # the agent implements the first group, task by task
-! sdd review G1                        # you review the group's commit
+/sdd-review G1                         # optional: a reviewer subagent checks the group
+! sdd review G1                        # you review the changes, side by side in your editor
 ! sdd approve G1                       # or: sdd revise G1 -m "..."
 ! sdd validate user-signup             # once every group is approved: report.md
 /sdd-deep-review user-signup           # optional: the agent checks each AC against the code

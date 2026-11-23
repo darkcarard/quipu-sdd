@@ -18,6 +18,7 @@ import (
 	"github.com/darkcarard/quipu-sdd/internal/agents"
 	"github.com/darkcarard/quipu-sdd/internal/app"
 	"github.com/darkcarard/quipu-sdd/internal/config"
+	"github.com/darkcarard/quipu-sdd/internal/diffview"
 	"github.com/darkcarard/quipu-sdd/internal/feature"
 	"github.com/darkcarard/quipu-sdd/internal/state"
 	"github.com/darkcarard/quipu-sdd/internal/templates"
@@ -42,6 +43,9 @@ type App struct {
 	Identity func(ctx context.Context) (feature.Identity, error)
 	// Now returns the current time; nil uses time.Now.
 	Now func() time.Time
+	// DiffEnv is where `sdd review` looks for an editor; the zero value uses
+	// the process environment.
+	DiffEnv diffview.Env
 }
 
 type command struct {

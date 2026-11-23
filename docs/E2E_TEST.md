@@ -31,20 +31,20 @@ sdd init --agent claude              # or codex, or antigravity
 git add -A && git commit -m "init"   # sdd implement needs at least one commit
 ```
 `init` creates `sdd.yaml`, `.sdd/` (templates, the Go profile and its `.gitignore`) and the agent's files (see [WORKFLOW.md](WORKFLOW.md#agent-setup)):
-- **Claude Code:** the six skills in `.claude/skills/`, `.mcp.json`, and `.claude/settings.json` (allows `mcp__sdd__*`, denies the human-only commands, installs the guard hook).
-- **Codex:** the six skills in `.agents/skills/`, `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json` and `.codex/rules/sdd.rules`.
-- **Antigravity:** the six skills in `.agents/skills/`, `AGENTS.md`, `.agents/mcp_config.json` and `.agents/hooks.json`.
+- **Claude Code:** the seven skills in `.claude/skills/`, the `sdd-reviewer` subagent in `.claude/agents/`, `.mcp.json`, and `.claude/settings.json` (allows `mcp__sdd__*`, denies the human-only commands, installs the guard hook).
+- **Codex:** the seven skills in `.agents/skills/`, `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json` and `.codex/rules/sdd.rules`.
+- **Antigravity:** the seven skills in `.agents/skills/`, `AGENTS.md`, `.agents/mcp_config.json` and `.agents/hooks.json`.
 
 ## 2. Open the agent
-**Claude Code:** run `claude` and approve the `sdd` MCP server when asked. Check with `/mcp` that `sdd` is connected with its 12 tools, and type `/` to see `/sdd-spec`, `/sdd-tech`, `/sdd-plan`, `/sdd-implement`, `/sdd-deep-review` and `/sdd-adopt`.
+**Claude Code:** run `claude` and approve the `sdd` MCP server when asked. Check with `/mcp` that `sdd` is connected with its 12 tools, and type `/` to see `/sdd-spec`, `/sdd-tech`, `/sdd-plan`, `/sdd-implement`, `/sdd-review`, `/sdd-deep-review` and `/sdd-adopt`, and `/agents` to see `sdd-reviewer`.
 
 **Codex:** run `codex` and trust the project when asked (Codex ignores `.codex/` otherwise). Then:
 - `/mcp` lists the `sdd` server and its 12 tools;
 - `/hooks` shows the `sdd hook pre-tool-use` hook: review and trust it, or it will not run;
-- `/skills` (or typing `$`) lists the six `sdd-*` skills.
+- `/skills` (or typing `$`) lists the seven `sdd-*` skills.
 Record whether `AGENTS.md` was picked up and whether the MCP tools were used without approval prompts.
 
-**Antigravity:** run `agy` and trust the folder when asked. Then `/mcp` shows the `sdd` server, `/hooks` the `sdd-guard` hook, and typing `/` lists the six `sdd-*` skills (run `/skills reload` if not).
+**Antigravity:** run `agy` and trust the folder when asked. Then `/mcp` shows the `sdd` server, `/hooks` the `sdd-guard` hook, and typing `/` lists the seven `sdd-*` skills (run `/skills reload` if not).
 
 ## 3. Specify (functional)
 In the agent:
@@ -90,11 +90,16 @@ In the agent:
 ```
 /sdd-implement <feature>
 ```
-For each task, the agent calls `task_next`, writes the code, then calls `task_done`. At the end of the group it calls `group_verify`, and it stops when the group is waiting for your review. Then, in the terminal:
+For each task, the agent calls `task_next`, writes the code, then calls `task_done`. At the end of the group it calls `group_verify`, and it stops when the group is waiting for your review. Optionally, ask for an expert review first:
+```
+/sdd-review G1                  # writes .sdd/features/<feature>/reviews/G1.md
+```
+In Claude Code, check that it runs in the `sdd-reviewer` subagent (the session receives only its summary) and that it writes nothing but the report. Then, in the terminal:
 ```sh
-sdd review G1                   # summary; --diff for the full diff
+sdd review G1                   # opens each changed file side by side in your editor (or prints the diff)
 sdd approve G1                  # or: sdd revise G1 -m "what to change"
 ```
+Check that `sdd review G1` opens the diffs without blocking the terminal (also with `!` in Claude Code), and that `SDD_REVIEW_EDITOR=none sdd review G1` prints the diff instead.
 Inside Claude Code, prefix them with `!` (`! sdd approve G1`); `/sdd-implement` is a slash command and takes no `!`.
 Repeat `/sdd-implement <feature>` for each group until the plan is done.
 

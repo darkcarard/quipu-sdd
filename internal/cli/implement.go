@@ -5,10 +5,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"path/filepath"
 
 	"github.com/darkcarard/quipu-sdd/internal/agents"
 	"github.com/darkcarard/quipu-sdd/internal/app"
+	"github.com/darkcarard/quipu-sdd/internal/diffview"
 	"github.com/darkcarard/quipu-sdd/internal/feature"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // oneFeature parses exactly one positional argument (the feature) and the flags defined on fs.
@@ -121,34 +124,67 @@ func (a *App) runGroup(ctx context.Context, args []string) error {
 	return nil
 }
 
+const reviewUsage = "sdd review [<group> | <feature>] [--diff | --no-open | --context]"
+
 func (a *App) runReview(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("review")
-	diff := fs.Bool("diff", false, "also print the full diff")
-	brief := fs.Bool("context", false, "print the brief for a deep review of the implemented feature (what review_context returns)")
-	arg, err := a.optionalTarget(fs, args, "sdd review [<group> | <feature>] [--diff | --context]")
+	diff := fs.Bool("diff", false, "print the full diff here instead of opening it in an editor")
+	noOpen := fs.Bool("no-open", false, "do not open the diff in an editor; show only the summary")
+	brief := fs.Bool("context", false, "print the brief for an agent review: of the group (what /sdd-review uses), or with a feature, a deep review of it (what /sdd-deep-review uses)")
+	arg, err := a.optionalTarget(fs, args, reviewUsage)
 	if err != nil {
 		return err
+	}
+	if *brief && (*diff || *noOpen) {
+		return a.usageErr(reviewUsage)
 	}
 	p, err := a.open()
 	if err != nil {
 		return err
 	}
 	if *brief {
-		if arg == "" {
-			return a.usageErr("sdd review <feature> --context")
+		var text string
+		if arg == "" || app.IsGroupID(arg) {
+			text, err = p.GroupReviewBrief(ctx, "", arg)
+		} else {
+			text, err = p.ReviewContext(ctx, arg)
 		}
-		text, err := p.ReviewContext(ctx, arg)
 		if err != nil {
 			return err
 		}
 		fmt.Fprint(a.Stdout, text)
 		return nil
 	}
-	r, err := p.Review(ctx, arg, *diff)
+	var editor, why string
+	if !*diff && !*noOpen {
+		editor, why = diffview.Find(p.Config.ReviewEditor(), a.DiffEnv)
+	}
+	r, err := p.Review(ctx, arg, *diff || (editor == "" && !*noOpen))
 	if err != nil {
 		return err
 	}
-	fmt.Fprint(a.Stdout, app.FormatReview(r))
+	var note string
+	if editor != "" {
+		name := filepath.Base(editor)
+		res, err := diffview.Open(ctx, diffview.Request{Editor: editor, Worktree: workspace.Open(r.Worktree, ""),
+			Base: r.Base, Dir: diffview.ScratchDir(filepath.Base(r.Worktree), r.Group.ID)})
+		switch {
+		case err != nil:
+			fmt.Fprintf(a.Stderr, "warning: could not open the diff in %s: %v\n", name, err)
+			if r, err = p.Review(ctx, arg, true); err != nil {
+				return err
+			}
+		case res.Total > res.Opened:
+			note = fmt.Sprintf("Opened the first %d of %d changed files side by side in %s (all of them: `sdd review %s --diff`).", res.Opened, res.Total, name, r.Group.ID)
+		case res.Total == 1:
+			note = "Opened the changed file side by side in " + name + "."
+		default:
+			note = fmt.Sprintf("Opened %d changed files side by side in %s.", res.Opened, name)
+		}
+	} else if why != "" {
+		note = "Showing the diff here: " + why + "."
+	}
+	fmt.Fprint(a.Stdout, app.FormatReview(r, note))
 	return nil
 }
 

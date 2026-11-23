@@ -465,11 +465,12 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
         <div class="n">4</div>
         <div class="body">
           <h3>Implement, one group at a time</h3>
-          <p>You start the implementation; <code>sdd</code> creates an isolated worktree on branch <code>sdd/&lt;f&gt;</code>. The agent works through the group and stops when it is ready for your review. Approve it to continue, or send it back with feedback.</p>
+          <p>You start the implementation; <code>sdd</code> creates an isolated worktree on branch <code>sdd/&lt;f&gt;</code>. The agent works through the group and stops when it is ready for your review. <code>sdd review</code> opens each changed file side by side in your editor (VS Code, VSCodium, Cursor; without one it prints the diff), and before that the <code><span class="sk">/</span>sdd-review</code> skill can have a reviewer check the group against the criteria, the language profile and your project's rules. Approve it to continue, or send it back with feedback.</p>
           <div class="pair">
             <div><span class="tag you">in your terminal</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd implement &lt;f&gt;</pre></div>
               <span class="tag agent" style="margin-top:14px">in <span class="ag">Claude Code</span></span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-implement &lt;f&gt;</pre></div></div>
-            <div><span class="tag you">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># --diff for the full diff</span>
+            <div><span class="tag agent">in <span class="ag">Claude Code</span> · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-review G1      <span class="c"># expert review, writes a report</span></pre></div>
+              <span class="tag you" style="margin-top:14px">in your terminal, per group</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">$ </span>sdd review G1          <span class="c"># side by side in your editor</span>
 <span class="p">$ </span>sdd approve G1
 <span class="c"># or send it back:</span>
 <span class="p">$ </span>sdd revise G1 -m <span class="s">"Handle the empty file case"</span></pre></div></div>
@@ -485,6 +486,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
             <div class="flow">
               <span class="chip agent">group_verify</span><span class="arrow">→</span>
               <span class="chip sdd">one commit with SDD trailers</span><span class="arrow">→</span>
+              <span class="chip agent">sdd-review (optional)</span><span class="arrow">→</span>
               <span class="chip you">sdd review</span><span class="arrow">→</span>
               <span class="chip you">approve</span><span class="arrow">or</span><span class="chip you">revise</span><span class="arrow">→</span>
               <span class="chip agent"><span class="sk">/</span>sdd-implement</span>
@@ -557,7 +559,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
 │  │  └─ report.md
 │  └─ worktrees/         <span class="y"># local only</span>
 ├─ .mcp.json
-└─ .claude/  skills/ settings.json</div>
+└─ .claude/  skills/ agents/ settings.json</div>
     </div>
   </section>
 
@@ -578,7 +580,8 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
           <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan.</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Create the worktree and start the first group.</td></tr>
           <tr><td><code><span class="sk">/</span>sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
-          <tr><td><code>sdd review G1 [--diff]</code></td><td class="who"><span class="tag you">you</span></td><td>Summary of the group waiting for review. Takes the group ID, a feature, or nothing when one feature is being implemented.</td></tr>
+          <tr><td><code><span class="sk">/</span>sdd-review G1</code></td><td class="who"><span class="tag agent">agent</span></td><td>Optional expert review of the group (criteria, language profile, project rules); writes a report.</td></tr>
+          <tr><td><code>sdd review G1 [--diff|--no-open]</code></td><td class="who"><span class="tag you">you</span></td><td>The group waiting for review, with its changes side by side in your editor (or printed when there is none). Takes the group ID, a feature, or nothing when one feature is being implemented.</td></tr>
           <tr><td><code>sdd approve G1</code> · <code>sdd revise G1 -m "…"</code></td><td class="who"><span class="tag you">you</span></td><td>Accept the group, or send it back with feedback.</td></tr>
           <tr><td><code>sdd validate &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Integration tests, all checks, <code>report.md</code>.</td></tr>
           <tr><td><code>sdd merge [&lt;f&gt;]</code></td><td class="who"><span class="tag you">you</span></td><td>Merge a validated feature into your branch, remove its worktree, commit its records.</td></tr>

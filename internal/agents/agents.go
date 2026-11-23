@@ -68,10 +68,14 @@ var skillVars = map[string]map[string]string{
 	"claude": {
 		"{{args}}": "$ARGUMENTS",
 		"{{tell}}": "sdd commands as `! sdd approve G2` (run in this session's shell), the skill as `/sdd-implement` (no `!`)",
+		// The sdd-reviewer subagent (.claude/agents) does the review in its own
+		// context, so the session only receives its summary.
+		"{{reviewer}}": "Launch the `sdd-reviewer` subagent with the Agent tool and give it only the group (and the feature, if given): it follows the steps below in its own context and returns a summary. Do the steps yourself only if that subagent is not available.",
 	},
 	"agents": {
-		"{{args}}": "as given in the user's request (none if they gave none)",
-		"{{tell}}": "sdd commands to run in their terminal (`sdd approve G2`), and this skill to continue (`$sdd-implement` in Codex, `/sdd-implement` in Antigravity)",
+		"{{args}}":     "as given in the user's request (none if they gave none)",
+		"{{tell}}":     "sdd commands to run in their terminal (`sdd approve G2`), and this skill to continue (`$sdd-implement` in Codex, `/sdd-implement` in Antigravity)",
+		"{{reviewer}}": "If you can hand work to a subagent, give it the steps below with the group (and the feature, if given), so the review runs in its own context; otherwise do them yourself.",
 	},
 }
 
@@ -109,6 +113,12 @@ func claudeFiles() ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+	reviewer, err := files.ReadFile("files/claude/agents/sdd-reviewer.md")
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, File{Path: ".claude/agents/sdd-reviewer.md", Content: reviewer,
+		Snippet: "This file differs from the built-in version; delete it and run `sdd init --agent claude` again to install the current one."})
 	server := map[string]any{"command": "sdd", "args": []string{"mcp"}}
 	mcpJSON := mustJSON(map[string]any{"mcpServers": map[string]any{"sdd": server}})
 	out = append(out, File{

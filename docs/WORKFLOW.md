@@ -52,6 +52,7 @@ The skills come from one source, so every agent gets the same instructions; only
 `sdd init --agent claude` installs:
 - `.mcp.json`: registers `sdd mcp` (stdio) as the `sdd` MCP server. Claude Code asks once to approve a project's MCP servers.
 - `.claude/skills/sdd-*/SKILL.md`: the `/sdd-*` commands.
+- `.claude/agents/sdd-reviewer.md`: the subagent that `/sdd-review` launches (see [Expert review of a group](#expert-review-of-a-group)).
 - `.claude/settings.json`: `allow` for every `sdd` MCP tool (`mcp__sdd__*`), `deny` rules for the human-only commands (`Bash(sdd approve *)` and the like; deny rules take precedence over any allow rule) and the guard hook on the Bash tool.
 
 Restart Claude Code in the project and approve the `sdd` server. You can run `sdd` commands with `! sdd approve G2` inside Claude Code: the hook does not apply to them.
@@ -87,6 +88,7 @@ Antigravity only reads command permission lists from your global settings, which
 | `sdd-tech <feature>` | Drafting the technical spec | M3 |
 | `sdd-plan <feature>` | Drafting the plan | M4 |
 | `sdd-implement <feature>` | Implementing tasks until the current group is ready for review | M5 |
+| `sdd-review [<group>]` | An expert review of the group under review, before you approve it | M8 |
 | `sdd-deep-review <feature>` | A semantic review of the code against the acceptance criteria | M6 |
 | `sdd-adopt [area]` | Documenting an existing project as baseline specs (see [Adopting an existing project](#adopting-an-existing-project-brownfield)) | M7 |
 
@@ -108,7 +110,7 @@ This document writes them as `/sdd-spec`; in Codex they are `$sdd-spec`. Re-runn
 | `task_next` | Start (or resume) the next task, or return pending review feedback | `sdd task next` |
 | `task_done` | Verify the current task and checkpoint it | `sdd task done` |
 | `group_verify` | Verify the whole group and squash it into one commit | `sdd group verify` |
-| `review_context` | Specs, plan, commits and test references for a deep review | `sdd review --context` |
+| `review_context` | With a group (or no arguments): the brief for an expert review of that group. With only a feature: specs, plan, commits and test references for a deep review | `sdd review [<group>\|<feature>] --context` |
 | `adopt_context` | An inventory of an existing project for `/sdd-adopt` | `sdd adopt --context` |
 
 ## State Machine
@@ -196,7 +198,8 @@ Validation (deterministic):
 | `/sdd-implement <feature>` | user → agent | Work through the group's tasks with `task_next` / `task_done`, then `group_verify` |
 | `sdd task next <feature>` / `sdd task done <feature> [--summary "…"]` | agent | CLI forms of the MCP tools |
 | `sdd group verify <feature>` | agent | CLI form of `group_verify` |
-| `sdd review [<group>\|<feature>] [--diff]` | **user** | Show the group: its commit, tasks with covered IDs and the agent's summaries, the verification results, the changes (`--diff` for the full diff) and any files changed outside the declared ones |
+| `sdd review [<group>\|<feature>] [--diff \| --no-open]` | **user** | Show the group: its commit, tasks with covered IDs and the agent's summaries, the verification results, the changed files and any files changed outside the declared ones. The changes open side by side in your editor (see [Viewing the changes](#viewing-the-changes)); `--diff` prints the full diff instead, `--no-open` shows only the summary |
+| `sdd-review [<group>]` | user → agent | Optional: an expert review of the group before you approve it (see [Expert review of a group](#expert-review-of-a-group)) |
 | `sdd approve [<group>\|<feature>]` | **user** | Approve the group under review; the agent's next `task_next` starts the next group |
 | `sdd revise [<group>\|<feature>] -m "<feedback>"` | **user** | Send the group back with feedback; the agent gets it from `task_next` |
 | `sdd resume <feature> [--discard] [--force-unlock]` | **user** | Repair state after an interruption (see [TRACEABILITY.md](TRACEABILITY.md)) |
@@ -222,6 +225,21 @@ For each group:
 The agent never commits itself, and a group never advances while the code fails to build or its tests fail. After `sdd revise`, `task_next` returns the feedback (and the group's changes so far) instead of a task; the agent addresses it and calls `group_verify` again, which squashes the group into a single commit once more. A `failed` group also goes back to the agent through `sdd revise`, with guidance. If a spec or the plan is edited during implementation, the feature leaves `implementing` (it becomes stale) and every implementation command stops until the artifacts are re-approved.
 
 `review`, `approve` and `revise` take the group ID (`sdd approve G2`): it names the feature being implemented whose current group it is, and must be that group. With no argument they act on the only feature being implemented; a feature name works too, and is needed when two features have the same current group.
+
+### Viewing the changes
+
+`sdd review` opens every changed file of the group side by side (before ↔ after) in a VS Code-compatible editor: `code`, `codium`, `cursor` or `windsurf`, the first one found on `PATH`. The right side is the file in the worktree, so you can edit it there; the left side is a copy of the version the group started from, written to your user cache directory (`~/.cache/sdd/review/` on Linux), outside the project. The editor returns at once, so neither the terminal nor your agent's shell (`!` in Claude Code) is blocked. At most 30 files are opened; `--diff` shows all of them.
+
+When no editor can be opened (none is installed, or there is no graphical session: no `DISPLAY`/`WAYLAND_DISPLAY` and not a VS Code terminal), `sdd review` prints the full diff instead. Choose the editor with `review.editor` in `sdd.yaml` (`none` always prints the diff), or per machine with the `SDD_REVIEW_EDITOR` environment variable or `.env` entry, which takes precedence.
+
+### Expert review of a group
+
+Before approving, you can ask your agent for an expert review with the `sdd-review` skill (`/sdd-review G2`; `$sdd-review G2` in Codex). The review:
+1. starts from `review_context` (`group: G2`): the worktree and the git range of the group, its diffstat, each task with its declared files, undeclared changes, the text of every FR and AC it covers and the agent's summary, the language and its profile, the technical spec, the guardrail files present in the project (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`), and the report format;
+2. reviews the changes as a senior engineer in that language, by those rules: correctness, whether each criterion is really met and tested, error handling and security, the architecture, the profile and the guardrails, needless complexity;
+3. writes `.sdd/features/<feature>/reviews/G2.md` (recommendation `approve` or `revise`, findings with severity and `file:line`, a verdict per criterion) and returns a short summary.
+
+In Claude Code the skill hands the review to the `sdd-reviewer` subagent, so it runs in its own context and your session only receives the summary; other agents use a subagent if they can, or do it in the session. The review is advice: it never edits code, approves or revises. The agent drafts a `sdd revise G2 -m "…"` message from the blocker and major findings; the decision stays yours.
 
 The verification commands run with the project's own shell (`sh -c`, or `cmd /C` on Windows) in the worktree and are killed, with their child processes, after `limits.command_timeout`. Only the tail of a failing command's output goes back to the agent and into the review: `limits.output_tail` characters (6000 by default), which bounds the token cost of failures.
 
@@ -291,6 +309,7 @@ sdd spec new [--technical|--baseline]|lint|approve
 sdd plan new <feature> | plan approve <feature>
 sdd implement | resume | clean <feature>
 sdd review | approve | revise [<group>|<feature>]   ·   sdd merge [<feature>]
+                                  (review: --diff | --no-open | --context)
 sdd task next|done <feature> · sdd group verify <feature>        (used by the agent)
 sdd validate <feature>
 sdd sync check [<feature>]

@@ -52,6 +52,9 @@ func (a *App) session(ctx context.Context, name, group string, fn func(s *implem
 
 var groupID = regexp.MustCompile(`^[Gg][0-9]+$`)
 
+// IsGroupID reports whether arg names a group (G2) rather than a feature.
+func IsGroupID(arg string) bool { return groupID.MatchString(arg) }
+
 // resolveGroup maps the argument of `sdd review|approve|revise` to a feature
 // and, for a group ID, the group: a feature name, a group ID (the feature
 // being implemented whose current group it is), or nothing (the only feature
@@ -149,6 +152,23 @@ func (a *App) GroupVerify(ctx context.Context, arg string) (out implement.Verifi
 // Review describes the group awaiting review.
 func (a *App) Review(ctx context.Context, arg string, diff bool) (out implement.Review, err error) {
 	err = a.reviewing(ctx, arg, func(s *implement.Session) (e error) { out, e = implement.ReviewGroup(ctx, s, diff); return })
+	return
+}
+
+// GroupReviewBrief returns the brief for an expert review of a group. With a
+// feature, group (optional) must be its current group; without one, group
+// finds the feature as Review does (empty: the only feature being implemented).
+func (a *App) GroupReviewBrief(ctx context.Context, feat, group string) (out string, err error) {
+	fn := func(s *implement.Session) (e error) { out, e = implement.ReviewBrief(ctx, s); return }
+	if feat == "" {
+		err = a.reviewing(ctx, group, fn)
+		return
+	}
+	name, err := a.Resolve(feat)
+	if err != nil {
+		return "", err
+	}
+	err = a.session(ctx, name, strings.ToUpper(group), fn)
 	return
 }
 

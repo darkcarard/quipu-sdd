@@ -306,12 +306,13 @@ func FormatVerified(v implement.Verified) string {
 }
 
 // FormatReview renders a group review for the user.
-func FormatReview(r implement.Review) string {
+// note, when set, says where the diff was opened (or why it is printed).
+func FormatReview(r implement.Review, note string) string {
 	var sb strings.Builder
 	g := r.Group
 	fmt.Fprintf(&sb, "Group %s: %s  [%s]\n", g.ID, g.Title, g.Status)
 	if g.Commit != "" {
-		fmt.Fprintf(&sb, "Commit: %s   (git -C %s show %s)\n", ShortSHA(g.Commit), r.Worktree, ShortSHA(g.Commit))
+		fmt.Fprintf(&sb, "Commit: %s\n", ShortSHA(g.Commit))
 	}
 	sb.WriteString("\nTasks:\n")
 	for _, t := range g.Tasks {
@@ -330,6 +331,9 @@ func FormatReview(r implement.Review) string {
 		fmt.Fprintf(&sb, "\nPending feedback: %s\n", g.Feedback)
 	}
 	fmt.Fprintf(&sb, "\nChanges:\n%s\n", r.DiffStat)
+	if note != "" {
+		fmt.Fprintf(&sb, "\n%s\n", note)
+	}
 	if r.Diff != "" {
 		fmt.Fprintf(&sb, "\n%s\n", r.Diff)
 	}
