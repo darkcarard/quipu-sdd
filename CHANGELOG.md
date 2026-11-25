@@ -4,7 +4,7 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
-## Unreleased
+## v0.2.1 (2026-11-25)
 
 ### Fixed
 - Re-approving the specs and the plan of a feature whose groups were already approved left it in `plan-approved`, so `sdd validate` refused to run until an extra `sdd implement`. The feature now returns to `implemented` (or `implementing` when the re-approved plan has groups still to do).
