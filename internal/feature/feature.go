@@ -141,7 +141,38 @@ func (f *Feature) reload() error {
 	}
 	f.Statuses = workflow.Evaluate(f.State.Approvals, current)
 	f.Phase = workflow.EffectiveFor(f.State.Phase, f.Statuses, f.Baseline())
+	if f.Phase == workflow.PlanApproved {
+		if p, ok := f.implementationPhase(); ok {
+			f.Phase = p
+		}
+	}
 	return nil
+}
+
+// implementationPhase is the phase an unmerged feature whose implementation
+// already started returns to once its plan is approved again (a spec edit
+// reopens a drafting phase, which overwrites the stored implementing or
+// implemented phase): implemented when every group of the approved plan is
+// approved, implementing otherwise. ok is false when no group has started.
+func (f *Feature) implementationPhase() (workflow.Phase, bool) {
+	if f.Plan == nil || f.State.Merged != nil {
+		return "", false
+	}
+	status := map[string]workflow.GroupStatus{}
+	started := false
+	for _, g := range f.State.Groups {
+		status[g.ID] = g.Status
+		started = started || g.BaseSHA != ""
+	}
+	if !started {
+		return "", false
+	}
+	for _, pg := range f.Plan.Groups {
+		if status[pg.ID] != workflow.GroupApproved {
+			return workflow.Implementing, true
+		}
+	}
+	return workflow.Implemented, true
 }
 
 // Lint returns the deterministic diagnostics of one artifact (parse errors plus

@@ -10,7 +10,7 @@ Every change can be traced from requirement to test, and back again:
 | `technical.md` | Requirement Traceability table (FR/NFR → component), Testing Strategy (AC → test level) |
 | `plan.md` | `covers: [...]` on each task `T#.#` |
 | Git commit | Trailers `SDD-Feature`, `SDD-Group`, `SDD-Tasks`, `SDD-Covers`, `SDD-Run` |
-| Tests | A `covers: AC-###` comment or a reference in the test name |
+| Tests | A `covers: AC-###` comment or a reference in the test name (in files the feature changed; `covers: <feature>/AC-###` anywhere) |
 
 ```
 $ sdd trace AC-003

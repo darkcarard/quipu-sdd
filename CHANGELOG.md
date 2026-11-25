@@ -4,6 +4,12 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
+## Unreleased
+
+### Fixed
+- Re-approving the specs and the plan of a feature whose groups were already approved left it in `plan-approved`, so `sdd validate` refused to run until an extra `sdd implement`. The feature now returns to `implemented` (or `implementing` when the re-approved plan has groups still to do).
+- `covers:` references are scoped to their feature: an unqualified `covers: AC-001` counts only in files the feature changed, so another feature's tests no longer satisfy (or trigger warnings about) this feature's criteria. Qualify a reference as `covers: <feature>/AC-001` to use it from any file.
+
 ## v0.2.0 (2026-11-23)
 
 ### Added

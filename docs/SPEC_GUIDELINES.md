@@ -144,6 +144,8 @@ func TestSignup_RejectsDuplicateEmail(t *testing.T) { … }
 
 The marker is `covers:` (any case) followed by one or more IDs on the same line (`# covers: AC-001, AC-002` in Python, `// covers: AC-003` in TypeScript, and so on). Any file git sees counts, except those under `specs/` and `.sdd/`. Every AC of an approved group needs at least one reference **[lint: sync]**.
 
+IDs are numbered per feature, so a reference counts for a feature only in files that feature changed (its group commits, plus uncommitted changes in its worktree): another feature's `covers: AC-001` is not taken for this one's `AC-001`. To reference a criterion from a file the feature did not change, or in a test file shared by several features, qualify it: `covers: user-signup/AC-003`. A qualified reference counts only for the feature it names.
+
 ## Approval and Sync Rules
 
 - Approval records the approver (from `git config user.name/email`), the time, the SHA-256 of the artifact, the hashes of its sources and the IDs it defines. It is journaled as a `spec.approve` or `plan.approve` action.
