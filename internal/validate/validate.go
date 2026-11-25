@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -199,6 +201,10 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 	if err != nil {
 		return ds, links, err
 	}
+	sharers, err := planSharers(f)
+	if err != nil {
+		return ds, links, err
+	}
 	for _, r := range refs {
 		for _, id := range r.For(f.Name) {
 			if !own[r.File] && !slices.Contains(r.IDs, f.Name+"/"+id) {
@@ -210,6 +216,13 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 			}
 			if f.Functional == nil {
 				continue
+			}
+			if !slices.Contains(r.IDs, f.Name+"/"+id) {
+				if others := sharers(r.File, id); len(others) > 0 {
+					ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: r.File, Line: r.Line,
+						Message: fmt.Sprintf("ambiguous covers %s: this file is also in the plan of %s, which defines %s; qualify it as %s/%s",
+							id, strings.Join(others, ", "), id, f.Name, id)})
+				}
 			}
 			if d, ok := f.Functional.Lookup(id); !ok {
 				ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: r.File, Line: r.Line,
@@ -242,6 +255,46 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 		}
 	}
 	return ds, links, nil
+}
+
+// planSharers returns a lookup of the other features whose plan declares a
+// file and whose functional spec defines an ID: there, an unqualified
+// `covers:` of that ID could belong to either feature.
+func planSharers(f *feature.Feature) (func(file, id string) []string, error) {
+	names, err := feature.List(f.Layout)
+	if err != nil {
+		return nil, err
+	}
+	byFile := map[string][]*feature.Feature{}
+	for _, n := range names {
+		if n == f.Name {
+			continue
+		}
+		o, err := feature.Load(f.Layout, f.Config, n)
+		if err != nil || o.Plan == nil || o.Functional == nil {
+			continue // an unreadable feature is reported by its own checks
+		}
+		seen := map[string]bool{}
+		for _, g := range o.Plan.Groups {
+			for _, t := range g.Tasks {
+				for _, file := range t.Files {
+					if file = path.Clean(file); !seen[file] {
+						seen[file] = true
+						byFile[file] = append(byFile[file], o)
+					}
+				}
+			}
+		}
+	}
+	return func(file, id string) []string {
+		var out []string
+		for _, o := range byFile[path.Clean(filepath.ToSlash(file))] {
+			if d, ok := o.Functional.Lookup(id); ok && !d.Retired {
+				out = append(out, o.Name)
+			}
+		}
+		return out
+	}, nil
 }
 
 // featureFiles returns the files the feature changed: in its branch's own

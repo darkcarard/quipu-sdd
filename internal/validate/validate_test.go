@@ -301,3 +301,30 @@ func TestCoversScopedToFeature(t *testing.T) {
 		t.Fatalf("qualified reference: %v %+v %v", ds, links.Tests, err)
 	}
 }
+
+// An unqualified `covers:` in a file that another feature's plan also declares,
+// for an ID both features define, is ambiguous and reported.
+func TestAmbiguousCoversInSharedFile(t *testing.T) {
+	ctx := context.Background()
+	p := implemented(t)
+	dir := p.l.SpecDir("other-feature")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "functional.md"), []byte(sddtest.Functional), 0o644)
+	os.WriteFile(filepath.Join(dir, "plan.md"), []byte(sddtest.Plan), 0o644)
+
+	ds, _, err := CheckCode(ctx, p.load())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "ambiguous covers AC-001: this file is also in the plan of other-feature, which defines AC-001; qualify it as " + sddtest.Feature + "/AC-001"
+	if !strings.Contains(fmt.Sprint(ds), want) || ds.HasErrors() {
+		t.Fatalf("diagnostics = %v", ds)
+	}
+
+	// Qualified, the reference is no longer ambiguous.
+	p.put("internal/signup/user_test.go", "package signup\n// covers: "+sddtest.Feature+"/AC-001\nfunc TestUser() {}\n")
+	ds, links, err := CheckCode(ctx, p.load())
+	if err != nil || strings.Contains(fmt.Sprint(ds), "ambiguous covers AC-001") || len(links.Tests["AC-001"]) != 1 {
+		t.Fatalf("qualified: %v %+v %v", ds, links.Tests, err)
+	}
+}

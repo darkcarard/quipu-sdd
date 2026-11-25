@@ -4,6 +4,11 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
+## Unreleased
+
+### Added
+- An unqualified `covers:` reference in a test file that another feature's plan also declares, to an ID both features define, is reported as ambiguous by `sdd sync check` and `sdd validate` (a warning that suggests `covers: <feature>/AC-###`).
+
 ## v0.2.1 (2026-11-25)
 
 ### Fixed
