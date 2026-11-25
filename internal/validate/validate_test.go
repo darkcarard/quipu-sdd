@@ -4,6 +4,7 @@ package validate
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -231,5 +232,72 @@ func TestValidateNeedsImplementation(t *testing.T) {
 	f.SetPhase(workflow.Implementing)
 	if _, err := Validate(context.Background(), f, user, now, verify.Options{Timeout: time.Minute}); err == nil || !strings.Contains(err.Error(), "every group approved") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// Re-approving the specs and the plan of a feature whose groups are all
+// approved returns it to implemented, so it can be validated again without
+// another `sdd implement`.
+func TestReapprovedPlanKeepsImplementation(t *testing.T) {
+	ctx := context.Background()
+	p := implemented(t)
+	path := filepath.Join(p.l.SpecDir(sddtest.Feature), "technical.md")
+	b, _ := os.ReadFile(path)
+	os.WriteFile(path, append(b, "\nA clarification.\n"...), 0o644)
+	if ph := p.load().Phase; ph != workflow.TechnicalDrafting {
+		t.Fatalf("edited technical: phase = %s", ph)
+	}
+	if _, err := p.load().Approve(workflow.Technical, user, now); err != nil {
+		t.Fatal(err)
+	}
+	if ph := p.load().Phase; ph != workflow.PlanDrafting {
+		t.Fatalf("stale plan: phase = %s", ph)
+	}
+	if _, err := p.load().Approve(workflow.Plan, user, now); err != nil {
+		t.Fatal(err)
+	}
+	f := p.load()
+	if f.Phase != workflow.Implemented || f.State.Phase != workflow.Implemented {
+		t.Fatalf("re-approved plan: phase = %s (stored %s)", f.Phase, f.State.Phase)
+	}
+	if r, err := Validate(ctx, f, user, now, verify.Options{Timeout: time.Minute}); err != nil || !r.Passed {
+		t.Fatalf("validate: %+v %v", r, err)
+	}
+}
+
+// A `covers:` reference counts for a feature only in files the feature
+// changed, or when it is qualified with the feature's name.
+func TestCoversScopedToFeature(t *testing.T) {
+	ctx := context.Background()
+	p := implemented(t)
+	main := workspace.Git{Dir: p.l.Root}
+	wt := workspace.Git{Dir: p.l.WorktreeDir(sddtest.Feature)}
+	// Another feature's test, merged into the branch from main.
+	other := func(content string) {
+		t.Helper()
+		os.MkdirAll(filepath.Join(p.l.Root, "other"), 0o755)
+		os.WriteFile(filepath.Join(p.l.Root, "other", "other_test.go"), []byte(content), 0o644)
+		main.Run(ctx, "add", "other")
+		main.Run(ctx, "commit", "-q", "-m", "another feature")
+		if _, err := wt.Run(ctx, "merge", "-q", "--no-edit", "main"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// AC-003 is referenced only by the other feature's test.
+	wt.Run(ctx, "rm", "-q", "internal/mail/mail_test.go")
+	wt.Run(ctx, "commit", "-q", "-m", "drop the test")
+	other("package other\n// covers: AC-003, other-feature/AC-001\n")
+	ds, links, err := CheckCode(ctx, p.load())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fmt.Sprint(ds), "AC-003 is not referenced by any test") || len(links.Tests["AC-001"]) != 1 || len(links.Tests["AC-003"]) != 0 {
+		t.Fatalf("another feature's reference counted: %v %+v", ds, links.Tests)
+	}
+	// Qualified with this feature, a reference counts in any file.
+	other("package other\n// covers: " + sddtest.Feature + "/AC-003\n")
+	ds, links, err = CheckCode(ctx, p.load())
+	if err != nil || strings.Contains(fmt.Sprint(ds), "AC-003 is not referenced") || len(links.Tests["AC-003"]) != 1 {
+		t.Fatalf("qualified reference: %v %+v %v", ds, links.Tests, err)
 	}
 }

@@ -27,16 +27,33 @@ import (
 	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
-// TestRef is a `covers:` reference found in a tracked file.
+// TestRef is a `covers:` reference found in a tracked file. IDs keep their
+// feature qualifier when the reference has one (`admin-auth/AC-001`).
 type TestRef struct {
 	File string
 	Line int
 	IDs  []string
 }
 
+// For returns the IDs of the reference that may belong to feature: the
+// unqualified ones and those qualified with feature (without the qualifier).
+func (r TestRef) For(feature string) []string {
+	var ids []string
+	for _, id := range r.IDs {
+		if q, plain, ok := strings.Cut(id, "/"); ok {
+			if q != feature {
+				continue
+			}
+			id = plain
+		}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 var (
 	coversRe = regexp.MustCompile(`(?i)covers:\s*(.*)`)
-	idRe     = regexp.MustCompile(`\b(?:FR|NFR|AC)-\d{3}\b`)
+	idRe     = regexp.MustCompile(`\b(?:[a-z0-9]+(?:-[a-z0-9]+)*/)?(?:FR|NFR|AC)-\d{3}\b`)
 )
 
 // ScanTests finds `covers: AC-###` references in the files of dir that git
@@ -176,8 +193,17 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 	if err != nil {
 		return ds, links, err
 	}
+	// Unqualified references count only in files this feature changed, so a
+	// `covers: AC-001` of another feature's test is not taken for this one's.
+	own, err := featureFiles(ctx, f, base, ref, commits)
+	if err != nil {
+		return ds, links, err
+	}
 	for _, r := range refs {
-		for _, id := range r.IDs {
+		for _, id := range r.For(f.Name) {
+			if !own[r.File] && !slices.Contains(r.IDs, f.Name+"/"+id) {
+				continue
+			}
 			loc := fmt.Sprintf("%s:%d", r.File, r.Line)
 			if !slices.Contains(links.Tests[id], loc) {
 				links.Tests[id] = append(links.Tests[id], loc)
@@ -218,6 +244,49 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 	return ds, links, nil
 }
 
+// featureFiles returns the files the feature changed: in its branch's own
+// commits since the first group started (or, once the branch is gone, in its trailer commits),
+// plus uncommitted changes in its worktree. Paths are relative to codeDir, like
+// those of ScanTests.
+func featureFiles(ctx context.Context, f *feature.Feature, base, ref string, commits []workspace.Commit) (map[string]bool, error) {
+	git := workspace.Git{Dir: codeDir(f)}
+	var out string
+	var err error
+	if ref == "HEAD" {
+		args := []string{"log", "--no-walk", "--name-only", "--relative", "--format="}
+		for _, c := range commits {
+			if c.Trailers["SDD-Feature"] == f.Name {
+				args = append(args, c.SHA)
+			}
+		}
+		if len(args) > 5 {
+			out, err = git.Run(ctx, args...)
+		}
+	} else {
+		// The branch's own commits: main merged into it does not count.
+		out, err = git.Run(ctx, "log", "--first-parent", "--no-merges", "--name-only", "--relative", "--format=", base+".."+ref)
+	}
+	if err != nil {
+		return nil, err
+	}
+	files := map[string]bool{}
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			files[line] = true
+		}
+	}
+	if wt := workspace.Open(f.Layout.WorktreeDir(f.Name), ref); wt.Exists() {
+		changed, err := wt.Changed(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range changed {
+			files[c] = true
+		}
+	}
+	return files, nil
+}
+
 func short(sha string) string {
 	if len(sha) > 10 {
 		return sha[:10]
@@ -242,7 +311,7 @@ func Index(ctx context.Context, f *feature.Feature) (*trace.Index, diag.List, er
 		}
 		tests := map[string][]string{}
 		for _, r := range refs {
-			for _, id := range r.IDs {
+			for _, id := range r.For(f.Name) {
 				tests[id] = append(tests[id], fmt.Sprintf("%s:%d", r.File, r.Line))
 			}
 		}
