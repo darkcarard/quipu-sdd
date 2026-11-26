@@ -4,7 +4,7 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
-## Unreleased
+## v0.3.0 (2026-11-26)
 
 ### Added
 - An unqualified `covers:` reference in a test file that another feature's plan also declares, to an ID both features define, is reported as ambiguous by `sdd sync check` and `sdd validate` (a warning that suggests `covers: <feature>/AC-###`).
@@ -16,6 +16,11 @@ To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sd
 - Re-approving the specs and plan of a merged feature moved it back to `plan-approved`, and `sdd status` suggested `sdd implement`. A merged feature now always shows as `validated` (states already affected are repaired when loaded).
 - `sdd validate` on a merged feature recreated the worktree from the old branch and left its records uncommitted. It now runs in the project checkout, removes a clean leftover worktree and commits the records; `sdd status` points to `sdd clean` when a worktree is left.
 - Unqualified `covers:` references in a test file shared by several features were reported as "not defined" or "ambiguous" in every feature that touched the file. In a file another feature's plan declares, a reference now belongs to the feature whose commit wrote the line (its `SDD-Feature` trailer, via `git blame`); only lines no feature wrote are still reported as ambiguous.
+
+### Upgrading a project
+- No integration files changed: `sdd init` is not needed.
+- A feature merged with an older version and later left in `plan-approved` shows as `validated` again; the next command that writes its state stores it. Do not run `sdd implement` on it.
+- `sdd spec lint` may now warn about references like `other-feature AC-001` in existing specs: write them as `other-feature/AC-001` (in a merged feature, approve the edit as an erratum).
 
 ## v0.2.1 (2026-11-25)
 
