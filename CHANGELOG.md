@@ -4,7 +4,7 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
-## Unreleased
+## v0.3.2 (2026-11-26)
 
 ### Changed
 - An unqualified ID that follows a qualified one in a list (`admin-auth/FR-008, FR-010`) is still read as that feature's, and spec lint now reports it so it is written qualified (`admin-auth/FR-010`).
