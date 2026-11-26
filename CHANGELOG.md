@@ -4,7 +4,7 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
-## Unreleased
+## v0.3.1 (2026-11-26)
 
 ### Fixed
 - Spec lint only reported the first ID of a list written after another feature's name (`admin-auth FR-008, FR-010`); every listed ID is now taken as that feature's. A list after a qualified ID (`mock-domain/FR-001, FR-002`) is qualified too.
