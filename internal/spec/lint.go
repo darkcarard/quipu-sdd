@@ -242,7 +242,7 @@ func lintSections(have []Heading, required []string, ds *diag.List) {
 func lintListed(xs []CrossRef, ds *diag.List) {
 	for _, x := range xs {
 		if x.Listed {
-			ds.Warnf(x.Line, "%s follows a %s/ ID in a list and is read as %s/%s: write it that way (an unqualified ID always means this spec's own)", x.ID, x.Feature, x.Feature, x.ID)
+			ds.Warnf(x.Line, "%s follows %s in a list, so it is checked against %s: write %s/%s, or separate it from the list if it means this spec's %s", x.ID, x.After, x.Feature, x.Feature, x.ID, x.ID)
 		}
 	}
 }
@@ -266,6 +266,10 @@ func lintIDs(defs []Definition, refs []ref, opts LintOptions, kinds []Kind, ds *
 		reported[key] = true
 		if !ValidID(r.ID) {
 			ds.Errorf(r.Line, "malformed ID %s: use the kind and three digits (e.g. %s-001)", r.ID, KindOf(r.ID))
+			continue
+		}
+		if r.Prefix != "" && slices.Contains(opts.OtherFeatures, r.Prefix) && r.After != "" {
+			ds.Warnf(r.Line, "%s follows %s in a list, so it is not checked against this spec: write %s/%s, or separate it from the list if it means this spec's %s", r.ID, r.After, r.Prefix, r.ID, r.ID)
 			continue
 		}
 		if r.Prefix != "" && slices.Contains(opts.OtherFeatures, r.Prefix) {

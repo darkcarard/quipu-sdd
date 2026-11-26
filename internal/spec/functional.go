@@ -204,6 +204,7 @@ func findRefs(lines []markdown.Line) ([]ref, []CrossRef) {
 		var prevEnd int
 		var prevFeature string
 		var prevQualified bool
+		var prevID string // the qualified ID that starts a list
 		for _, loc := range anyIDRe.FindAllStringIndex(l.Text, -1) {
 			id, before := l.Text[loc[0]:loc[1]], l.Text[:loc[0]]
 			listed := prevFeature != "" && listSepRe.MatchString(l.Text[prevEnd:loc[0]])
@@ -211,22 +212,25 @@ func findRefs(lines []markdown.Line) ([]ref, []CrossRef) {
 			switch m := qualifiedRe.FindStringSubmatch(before); {
 			case strings.HasSuffix(before, "/") && m != nil:
 				xs = append(xs, CrossRef{Feature: m[1], ID: id, Line: l.N})
-				prevFeature, prevQualified = m[1], true
+				prevFeature, prevQualified, prevID = m[1], true, id
 				continue
 			case strings.HasSuffix(before, "/"):
 				prevFeature = ""
 				continue
 			case listed && prevQualified:
-				xs = append(xs, CrossRef{Feature: prevFeature, ID: id, Line: l.N, Listed: true})
+				xs = append(xs, CrossRef{Feature: prevFeature, ID: id, Line: l.N, Listed: true, After: prevFeature + "/" + prevID})
 				continue
 			}
 			r := ref{ID: id, Line: l.N}
 			if m := prefixRe.FindStringSubmatch(before); m != nil {
 				r.Prefix = m[1]
 			} else if listed {
-				r.Prefix = prevFeature
+				r.Prefix, r.After = prevFeature, prevID
 			}
 			out = append(out, r)
+			if r.After == "" {
+				prevID = r.Prefix + " " + id
+			}
 			prevFeature, prevQualified = r.Prefix, false
 		}
 	}

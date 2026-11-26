@@ -96,7 +96,7 @@ func TestLintFunctional(t *testing.T) {
 		{"other feature's ID defined here too", "(see AC-001)", "(like `admin-api`'s AC-001)", LintOptions{OtherFeatures: []string{"admin-api"}},
 			want{diag.Warning, "admin-api AC-001 reads as a reference to feature admin-api"}},
 		{"list after another feature's name", "(see AC-001)", "(see `admin-auth` FR-008, FR-010 and AC-001)", LintOptions{OtherFeatures: []string{"admin-auth"}},
-			want{diag.Warning, "admin-auth FR-010 reads as a reference to feature admin-auth: write admin-auth/FR-010"}},
+			want{diag.Warning, "FR-010 follows admin-auth FR-008 in a list, so it is not checked against this spec: write admin-auth/FR-010, or separate it from the list if it means this spec's FR-010"}},
 		{"missing non-goals", "## Non-Goals\n\n- Social login.\n", "", LintOptions{},
 			want{diag.Error, `missing required section "## Non-Goals"`}},
 	}
@@ -262,7 +262,7 @@ func TestCrossReferenceLists(t *testing.T) {
 		t.Errorf("a listed qualified ID was resolved here:\n%v", ds)
 	}
 	for _, id := range []string{"FR-002", "FR-003"} {
-		if !hasDiag(ds, want{diag.Warning, id + " follows a mock-domain/ ID in a list and is read as mock-domain/" + id}) {
+		if !hasDiag(ds, want{diag.Warning, id + " follows mock-domain/FR-001 in a list, so it is checked against mock-domain: write mock-domain/" + id + ", or separate it from the list if it means this spec's " + id}) {
 			t.Errorf("no warning for %s:\n%v", id, ds)
 		}
 	}

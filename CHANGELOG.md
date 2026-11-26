@@ -4,6 +4,11 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
+## Unreleased
+
+### Fixed
+- Clearer lint warnings for IDs listed after another feature's ID: they name the ID that starts the list and say how the ID is checked (`FR-010 follows admin-auth/FR-008 in a list, so it is checked against admin-auth: write admin-auth/FR-010, or separate it from the list if it means this spec's FR-010`), instead of "follows a admin-auth/ ID … an unqualified ID always means this spec's own".
+
 ## v0.3.2 (2026-11-26)
 
 ### Changed

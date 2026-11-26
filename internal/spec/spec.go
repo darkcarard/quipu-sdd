@@ -74,6 +74,9 @@ type ref struct {
 	ID     string
 	Line   int
 	Prefix string
+	// After is the first ID of the list when Prefix was inherited from it
+	// ("admin-api AC-018, AC-019": AC-019 is after "admin-api AC-018").
+	After string
 }
 
 // CrossRef is a reference to another feature's ID, written <feature>/<ID>.
@@ -85,6 +88,8 @@ type CrossRef struct {
 	// list ("admin-auth/FR-008, FR-010"): it is read as that feature's, and
 	// lint asks for it to be qualified.
 	Listed bool
+	// After is the qualified ID that starts the list of a Listed reference.
+	After string
 }
 
 // Meta is the common frontmatter.
