@@ -49,7 +49,7 @@ func ParseTechnical(content []byte) (*Technical, diag.List) {
 			t.Architecture = strings.TrimSpace(strings.Join(lines, "\n"))
 		}
 	}
-	t.refs = findRefs(doc.Lines)
+	t.refs, t.xrefs = findRefs(doc.Lines)
 	return t, ds
 }
 

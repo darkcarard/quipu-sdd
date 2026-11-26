@@ -507,7 +507,7 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
 <span class="p">$ </span>sdd merge &lt;f&gt;</pre></div></div>
             <div><span class="tag agent">in <span class="ag">Claude Code</span> · optional</span><div class="code"><button class="copy" type="button">Copy</button><pre><span class="p">&gt; </span><span class="sk">/</span>sdd-deep-review &lt;f&gt;</pre></div></div>
           </div>
-          <span class="check"><span><code>sdd merge</code> merges branch <code>sdd/&lt;f&gt;</code> into the branch checked out in your project, from any directory, removes the worktree and commits the feature's records. Prefer a pull request? Merge it your way, then run <code>sdd merge &lt;f&gt;</code> anyway: it sees the work is already there and only records it.</span></span>
+          <span class="check"><span><code>sdd merge</code> merges branch <code>sdd/&lt;f&gt;</code> into the branch checked out in your project, from any directory, removes the worktree and commits the feature's records. Prefer a pull request? Merge it your way, then run <code>sdd merge &lt;f&gt;</code> anyway: it sees the work is already there and only records it. Found a mistake in a spec after the merge? Fix it and approve it as usual: it is an <em>erratum</em>, the feature stays validated and the plan does not need a new approval (as long as the IDs stay the same).</span></span>
         </div>
       </div>
     </div>
@@ -576,8 +576,8 @@ html[data-agent="antigravity"] [data-only~="antigravity"] { display: revert !imp
           <tr><td><code>sdd init --agent <span class="ag-id">claude</span></code></td><td class="who"><span class="tag you">you</span></td><td>Set up the project for <span class="ag">Claude Code</span> (<code>claude</code>, <code>codex</code>, <code>antigravity</code> or <code>generic</code>). <code>--check</code> lists what is missing.</td></tr>
           <tr><td><code>sdd status [&lt;f&gt;]</code></td><td class="who"><span class="tag sdd">anyone</span></td><td>Phase of each feature and the next action.</td></tr>
           <tr><td><code><span class="sk">/</span>sdd-spec</code> · <code><span class="sk">/</span>sdd-tech</code> · <code><span class="sk">/</span>sdd-plan</code></td><td class="who"><span class="tag agent">agent</span></td><td>Draft the functional spec, the technical spec, the plan.</td></tr>
-          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content and commit the feature's records.</td></tr>
-          <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan.</td></tr>
+          <tr><td><code>sdd spec approve &lt;f&gt; --functional|--technical</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze a spec at its current content and commit the feature's records. If the spec was edited in the feature's worktree, add <code>--from-worktree</code> to approve that version.</td></tr>
+          <tr><td><code>sdd plan approve &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Freeze the plan (<code>--from-worktree</code> as above).</td></tr>
           <tr><td><code>sdd implement &lt;f&gt;</code></td><td class="who"><span class="tag you">you</span></td><td>Create the worktree and start the first group.</td></tr>
           <tr><td><code><span class="sk">/</span>sdd-implement &lt;f&gt;</code></td><td class="who"><span class="tag agent">agent</span></td><td>Work through the current group until it is ready for review.</td></tr>
           <tr><td><code><span class="sk">/</span>sdd-review G1</code></td><td class="who"><span class="tag agent">agent</span></td><td>Optional expert review of the group (criteria, language profile, project rules); writes a report.</td></tr>

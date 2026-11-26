@@ -204,3 +204,51 @@ func TestMergeNeedsTheWorkOnTheBranch(t *testing.T) {
 	git("branch", "-D", "sdd/user-signup")
 	contains(t, mustRun(t, dir, ExitError, "merge", sddtest.Feature), "branch sdd/user-signup not found, and its validated commit")
 }
+
+// A spec edited in the worktree is not silently skipped by its approval:
+// approvals read the project checkout, so the worktree's version is refused
+// until --from-worktree copies it there.
+func TestApproveSpecEditedInTheWorktree(t *testing.T) {
+	dir := gitProject(t)
+	mustRun(t, dir, ExitOK, "implement", sddtest.Feature)
+	wtFile := filepath.Join(dir, ".sdd", "worktrees", sddtest.Feature, "specs", sddtest.Feature, "technical.md")
+	b, err := os.ReadFile(wtFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edited := append(b, "\nA clarification made in the worktree.\n"...)
+	os.WriteFile(wtFile, edited, 0o644)
+
+	contains(t, mustRun(t, dir, ExitError, "spec", "approve", sddtest.Feature, "--technical"),
+		"edited in .sdd/worktrees/user-signup", "would approve the version that is already approved", "--from-worktree")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--technical", "--from-worktree"), "approved specs/user-signup/technical.md")
+	if got, _ := os.ReadFile(filepath.Join(dir, "specs", sddtest.Feature, "technical.md")); string(got) != string(edited) {
+		t.Fatal("the worktree's version was not copied into the project checkout")
+	}
+	// Same version on both sides: nothing to report.
+	contains(t, mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--technical"), "already approved")
+}
+
+// After the merge, a spec correction is an erratum: the feature stays
+// validated, the plan is restamped (not re-approved), and a later validation
+// runs in the project checkout and commits its records.
+func TestErratumAfterMergeCLI(t *testing.T) {
+	dir, _, git := validatedProject(t)
+	mustRun(t, dir, ExitOK, "merge")
+	path := filepath.Join(dir, "specs", sddtest.Feature, "technical.md")
+	b, _ := os.ReadFile(path)
+	os.WriteFile(path, append(b, "\nA clarification.\n"...), 0o644)
+
+	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature), "validated", "edited after the merge")
+	contains(t, mustRun(t, dir, ExitOK, "spec", "approve", sddtest.Feature, "--technical"),
+		"erratum of a merged feature: the phase stays validated; plan.md restamped", "committed the specs and records")
+	contains(t, git("log", "-1", "--format=%s"), "sdd(user-signup): approve an erratum to the technical spec")
+	contains(t, mustRun(t, dir, ExitOK, "status", sddtest.Feature), "Next: nothing: sdd/user-signup was merged into main")
+	contains(t, mustRun(t, dir, ExitOK, "validate", sddtest.Feature), "validation PASSED", "checked in the project checkout", "committed the specs and records")
+	if st := git("status", "--porcelain", "--", "specs", ".sdd"); st != "" {
+		t.Errorf("records left uncommitted:\n%s", st)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".sdd", "worktrees", sddtest.Feature)); !os.IsNotExist(err) {
+		t.Errorf("validate recreated the worktree: %v", err)
+	}
+}

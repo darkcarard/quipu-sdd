@@ -1,6 +1,7 @@
 package spec
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -90,6 +91,10 @@ func TestLintFunctional(t *testing.T) {
 			want{diag.Warning, `"PostgreSQL" looks like an implementation detail`}},
 		{"AC outside FR", "- **NFR-001:**", "- **AC-004:** Given x, when y, then z.\n- **NFR-001:**", LintOptions{},
 			want{diag.Error, "AC-004 must be defined under an FR"}},
+		{"other feature's ID", "(see AC-001)", "(see mock-domain FR-012)", LintOptions{OtherFeatures: []string{"mock-domain"}},
+			want{diag.Warning, "mock-domain FR-012 reads as a reference to feature mock-domain: write mock-domain/FR-012"}},
+		{"other feature's ID defined here too", "(see AC-001)", "(like `admin-api`'s AC-001)", LintOptions{OtherFeatures: []string{"admin-api"}},
+			want{diag.Warning, "admin-api AC-001 reads as a reference to feature admin-api"}},
 		{"missing non-goals", "## Non-Goals\n\n- Social login.\n", "", LintOptions{},
 			want{diag.Error, `missing required section "## Non-Goals"`}},
 	}
@@ -211,5 +216,32 @@ func TestIDHelpers(t *testing.T) {
 	SortIDs(ids)
 	if !reflect.DeepEqual(ids, []string{"FR-002", "FR-010", "NFR-001", "AC-002", "ADR-001"}) {
 		t.Errorf("SortIDs = %v", ids)
+	}
+}
+
+func TestCrossFeatureReferences(t *testing.T) {
+	src := strings.Replace(sddtest.Functional, "(see AC-001)", "(see AC-001, mock-domain/FR-012 and admin-api AC-018)", 1)
+	f, ds := lintFunctional(t, src, LintOptions{OtherFeatures: []string{"admin-api", "mock-domain"}})
+	if xs := f.CrossRefs(); len(xs) != 1 || xs[0].Feature != "mock-domain" || xs[0].ID != "FR-012" || xs[0].Line == 0 {
+		t.Errorf("cross refs = %+v", f.CrossRefs())
+	}
+	if ds.HasErrors() || strings.Contains(fmt.Sprint(ds), "FR-012") {
+		t.Errorf("a qualified reference is not this spec's; got:\n%v", ds)
+	}
+	if !hasDiag(ds, want{diag.Warning, "admin-api AC-018 reads as a reference"}) || hasDiag(ds, want{diag.Error, "AC-018"}) {
+		t.Errorf("feature-prefixed ID: got:\n%v", ds)
+	}
+	// Without the feature list, the prefixed ID is resolved here as before.
+	if _, ds := lintFunctional(t, src, LintOptions{}); !hasDiag(ds, want{diag.Error, "AC-018 is referenced but not defined"}) {
+		t.Errorf("unknown prefix: got:\n%v", ds)
+	}
+
+	fn, _ := ParseFunctional([]byte(sddtest.Functional))
+	tech, _ := ParseTechnical([]byte(strings.Replace(sddtest.Technical, "| FR-002 | Mailer | |", "| FR-002 | Mailer (reuses admin-api FR-009) | |", 1)))
+	if ds := CheckTechnical(fn, tech, "admin-api"); len(ds) != 0 {
+		t.Errorf("a feature-prefixed ID is left to lint, got:\n%v", ds)
+	}
+	if ds := CheckTechnical(fn, tech); !hasDiag(ds, want{diag.Error, "FR-009 is not defined in functional.md"}) {
+		t.Errorf("without the feature list: got:\n%v", ds)
 	}
 }

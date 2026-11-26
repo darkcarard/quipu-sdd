@@ -4,9 +4,11 @@ package validate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -303,7 +305,8 @@ func TestCoversScopedToFeature(t *testing.T) {
 }
 
 // An unqualified `covers:` in a file that another feature's plan also declares,
-// for an ID both features define, is ambiguous and reported.
+// for an ID both features define, belongs to the feature whose commit wrote the
+// line (its SDD-Feature trailer); without one it is ambiguous and reported.
 func TestAmbiguousCoversInSharedFile(t *testing.T) {
 	ctx := context.Background()
 	p := implemented(t)
@@ -312,19 +315,154 @@ func TestAmbiguousCoversInSharedFile(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "functional.md"), []byte(sddtest.Functional), 0o644)
 	os.WriteFile(filepath.Join(dir, "plan.md"), []byte(sddtest.Plan), 0o644)
 
-	ds, _, err := CheckCode(ctx, p.load())
+	// Written by this feature's group commit.
+	ds, links, err := CheckCode(ctx, p.load())
+	if err != nil || len(ds) != 0 || len(links.Tests["AC-001"]) != 1 {
+		t.Fatalf("own line: %v %+v %v", ds, links.Tests, err)
+	}
+
+	// Written by a commit of the other feature: its reference, not this one's.
+	wt := workspace.Git{Dir: p.l.WorktreeDir(sddtest.Feature)}
+	test := "package signup\n// covers: AC-001\nfunc TestUser() {}\n// covers: AC-002\nfunc TestOther() {}\n"
+	p.put("internal/signup/user_test.go", test)
+	wt.Run(ctx, "commit", "-q", "-am", workspace.CommitMessage("other", workspace.Trailers{Feature: "other-feature"}))
+	ds, links, err = CheckCode(ctx, p.load())
+	if err != nil || strings.Contains(fmt.Sprint(ds), "ambiguous") || slices.Contains(links.Tests["AC-002"], "internal/signup/user_test.go:4") {
+		t.Fatalf("other feature's line: %v %+v %v", ds, links.Tests, err)
+	}
+
+	// Not committed yet: nobody wrote it, so it is ambiguous.
+	p.put("internal/signup/user_test.go", test+"// covers: AC-003\n")
+	ds, _, err = CheckCode(ctx, p.load())
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "ambiguous covers AC-001: this file is also in the plan of other-feature, which defines AC-001; qualify it as " + sddtest.Feature + "/AC-001"
+	want := "ambiguous covers AC-003: this file is also in the plan of other-feature, which defines AC-003; qualify it as " + sddtest.Feature + "/AC-003"
 	if !strings.Contains(fmt.Sprint(ds), want) || ds.HasErrors() {
 		t.Fatalf("diagnostics = %v", ds)
 	}
 
 	// Qualified, the reference is no longer ambiguous.
-	p.put("internal/signup/user_test.go", "package signup\n// covers: "+sddtest.Feature+"/AC-001\nfunc TestUser() {}\n")
-	ds, links, err := CheckCode(ctx, p.load())
-	if err != nil || strings.Contains(fmt.Sprint(ds), "ambiguous covers AC-001") || len(links.Tests["AC-001"]) != 1 {
+	p.put("internal/signup/user_test.go", test+"// covers: "+sddtest.Feature+"/AC-003\n")
+	ds, links, err = CheckCode(ctx, p.load())
+	if err != nil || strings.Contains(fmt.Sprint(ds), "ambiguous") || len(links.Tests["AC-003"]) != 2 {
 		t.Fatalf("qualified: %v %+v %v", ds, links.Tests, err)
+	}
+}
+
+// An unqualified `covers:` in a file that another feature's plan also declares,
+// for an ID only that feature defines, is the other feature's: no warning.
+func TestSharedFileCoversOfAnotherFeature(t *testing.T) {
+	ctx := context.Background()
+	p := implemented(t)
+	dir := p.l.SpecDir("other-feature")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "functional.md"), []byte(strings.Replace(sddtest.Functional, "AC-003", "AC-032", -1)), 0o644)
+	os.WriteFile(filepath.Join(dir, "plan.md"), []byte(sddtest.Plan), 0o644)
+	p.put("internal/signup/user_test.go", "package signup\n// covers: AC-001\n// covers: AC-032\n// covers: AC-099\nfunc TestUser() {}\n")
+
+	ds, links, err := CheckCode(ctx, p.load())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(ds); strings.Contains(got, "AC-032") || !strings.Contains(got, "covers AC-099, which is not defined") {
+		t.Fatalf("diagnostics = %v", ds)
+	}
+	if len(links.Tests["AC-032"]) != 0 {
+		t.Fatalf("another feature's ID linked: %+v", links.Tests)
+	}
+}
+
+// merged returns a validated feature merged into main with sdd merge.
+func merged(t *testing.T) *project {
+	t.Helper()
+	ctx := context.Background()
+	p := implemented(t)
+	if r, err := Validate(ctx, p.load(), user, now, verify.Options{Timeout: time.Minute}); err != nil || !r.Passed {
+		t.Fatalf("validate: %+v %v", r, err)
+	}
+	if _, err := implement.Merge(ctx, p.session(user)); err != nil {
+		t.Fatal(err)
+	}
+	g := workspace.Git{Dir: p.l.Root}
+	g.Run(ctx, "add", ".")
+	g.Run(ctx, "commit", "-q", "-m", "records")
+	return p
+}
+
+// A spec edited after the merge is an erratum: the feature stays validated
+// and approving it restamps the plan instead of asking for its re-approval.
+func TestErratumAfterMerge(t *testing.T) {
+	p := merged(t)
+	path := filepath.Join(p.l.SpecDir(sddtest.Feature), "technical.md")
+	b, _ := os.ReadFile(path)
+	os.WriteFile(path, append(b, "\nA clarification.\n"...), 0o644)
+
+	f := p.load()
+	if f.Phase != workflow.Validated || len(f.Errata()) != 1 || !strings.Contains(f.Next(), "edited after the merge") {
+		t.Fatalf("edited after merge: phase %s, errata %v, next %q", f.Phase, f.Errata(), f.Next())
+	}
+	if _, err := implement.Start(context.Background(), p.session(user)); err == nil {
+		t.Fatal("implement started on a merged feature")
+	}
+	if _, err := f.Approve(workflow.Technical, user, now); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Restamped) != 1 || f.Restamped[0] != workflow.Plan {
+		t.Fatalf("restamped = %v", f.Restamped)
+	}
+	f = p.load()
+	for a, st := range f.Statuses {
+		if st != workflow.StatusApproved {
+			t.Errorf("%s is %s", a, st)
+		}
+	}
+	if f.Phase != workflow.Validated || f.State.Phase != workflow.Validated || f.Plan.TechnicalHash != f.Files[workflow.Technical].Hash {
+		t.Fatalf("after the erratum: phase %s (stored %s), plan technical_hash %s", f.Phase, f.State.Phase, f.Plan.TechnicalHash)
+	}
+	if ds := f.Sync(); ds.HasErrors() {
+		t.Fatalf("sync: %v", ds)
+	}
+
+	// An edit that changes the IDs is new behavior, not an erratum.
+	path = filepath.Join(p.l.SpecDir(sddtest.Feature), "functional.md")
+	b, _ = os.ReadFile(path)
+	os.WriteFile(path, []byte(strings.Replace(string(b), "**AC-003:**", "**AC-004:**", 1)), 0o644)
+	_, err := p.load().Approve(workflow.Functional, user, now)
+	if !errors.Is(err, feature.ErrErratumIDs) || !strings.Contains(err.Error(), "adds AC-004 and removes AC-003") {
+		t.Fatalf("ID change: %v", err)
+	}
+
+	// A state left in plan-approved by an older sdd is shown as validated.
+	f = p.load()
+	f.State.Phase = workflow.PlanApproved
+	f.SaveState()
+	if ph := p.load().Phase; ph != workflow.Validated {
+		t.Fatalf("legacy state: phase %s", ph)
+	}
+}
+
+// Validating a merged feature checks the project checkout and removes a
+// leftover worktree instead of recreating it from the old branch.
+func TestValidateMergedFeature(t *testing.T) {
+	ctx := context.Background()
+	p := merged(t)
+	wtDir := p.l.WorktreeDir(sddtest.Feature)
+	if _, err := (workspace.Git{Dir: p.l.Root}).Run(ctx, "worktree", "add", "-q", wtDir, workspace.Branch(sddtest.Feature)); err != nil {
+		t.Fatal(err)
+	}
+	f := p.load()
+	if !strings.Contains(f.Next(), "sdd clean") {
+		t.Fatalf("next with a leftover worktree: %q", f.Next())
+	}
+	r, err := Validate(ctx, f, user, now, verify.Options{Timeout: time.Minute})
+	if err != nil || !r.Passed || !r.Merged || !r.Removed {
+		t.Fatalf("validate: %+v %v", r, err)
+	}
+	if _, err := os.Stat(wtDir); err == nil {
+		t.Fatal("the leftover worktree is still there")
+	}
+	if f := p.load(); f.Phase != workflow.Validated || strings.Contains(f.Next(), "sdd clean") {
+		t.Fatalf("after validate: phase %s, next %q", f.Phase, f.Next())
 	}
 }

@@ -19,6 +19,10 @@ type LintOptions struct {
 	PreviousIDs []string
 	// ProfileExists reports whether .sdd/profiles/<language>.md exists (technical only; nil skips).
 	ProfileExists func(language string) bool
+	// OtherFeatures are the project's other features: an ID written right after
+	// one of their names ("admin-api AC-018") is reported as a reference that
+	// should be qualified, instead of being resolved against this spec.
+	OtherFeatures []string
 }
 
 // LintFunctional applies the functional-spec guardrails of docs/SPEC_GUIDELINES.md.
@@ -26,7 +30,7 @@ func LintFunctional(f *Functional, opts LintOptions) diag.List {
 	var ds diag.List
 	lintMeta(f.Meta, opts.Feature, &ds)
 	lintSections(f.Sections, FunctionalSections, &ds)
-	lintIDs(f.Defined, f.refs, opts.PreviousIDs, []Kind{KindFR, KindNFR, KindAC}, &ds)
+	lintIDs(f.Defined, f.refs, opts, []Kind{KindFR, KindNFR, KindAC}, &ds)
 
 	active := 0
 	for _, r := range f.Requirements {
@@ -99,7 +103,7 @@ func LintTechnical(t *Technical, opts LintOptions) diag.List {
 		ds.Warnf(1, "frontmatter: commands.integration is empty; sdd validate will run no integration tests")
 	}
 	lintSections(t.Sections, TechnicalSections, &ds)
-	lintIDs(t.Defined, t.refs, opts.PreviousIDs, []Kind{KindADR}, &ds)
+	lintIDs(t.Defined, t.refs, opts, []Kind{KindADR}, &ds)
 
 	for _, m := range t.Traceability {
 		lintMapping(m, secTraceability, []Kind{KindFR, KindNFR}, "component", &ds)
@@ -130,7 +134,10 @@ func LintTechnical(t *Technical, opts LintOptions) diag.List {
 // CheckTechnical runs the spec↔spec checks: every active FR and NFR is mapped to a
 // component, every active AC to a test level, and every referenced ID exists.
 // Diagnostics are located in the technical spec.
-func CheckTechnical(f *Functional, t *Technical) diag.List {
+//
+// An ID written right after the name of one of otherFeatures is skipped: lint
+// reports it as a reference to qualify.
+func CheckTechnical(f *Functional, t *Technical, otherFeatures ...string) diag.List {
 	var ds diag.List
 	trLine, tsLine := sectionLine(t.Sections, secTraceability), sectionLine(t.Sections, secTesting)
 	for _, id := range f.Active(KindFR, KindNFR) {
@@ -146,7 +153,7 @@ func CheckTechnical(f *Functional, t *Technical) diag.List {
 	seen := map[string]bool{}
 	for _, r := range t.refs {
 		k := KindOf(r.ID)
-		if k == KindADR || !ValidID(r.ID) || seen[r.ID+fmt.Sprint(r.Line)] {
+		if k == KindADR || !ValidID(r.ID) || seen[r.ID+fmt.Sprint(r.Line)] || slices.Contains(otherFeatures, r.Prefix) {
 			continue
 		}
 		seen[r.ID+fmt.Sprint(r.Line)] = true
@@ -228,7 +235,8 @@ func lintSections(have []Heading, required []string, ds *diag.List) {
 
 // lintIDs checks ID format, numbering gaps, references to undefined IDs and IDs
 // deleted since the last approval. kinds are the kinds this document defines.
-func lintIDs(defs []Definition, refs []ref, previous []string, kinds []Kind, ds *diag.List) {
+func lintIDs(defs []Definition, refs []ref, opts LintOptions, kinds []Kind, ds *diag.List) {
+	previous := opts.PreviousIDs
 	defined := map[string]Definition{}
 	nums := map[Kind][]int{}
 	for _, d := range defs {
@@ -246,6 +254,10 @@ func lintIDs(defs []Definition, refs []ref, previous []string, kinds []Kind, ds 
 		reported[key] = true
 		if !ValidID(r.ID) {
 			ds.Errorf(r.Line, "malformed ID %s: use the kind and three digits (e.g. %s-001)", r.ID, KindOf(r.ID))
+			continue
+		}
+		if r.Prefix != "" && slices.Contains(opts.OtherFeatures, r.Prefix) {
+			ds.Warnf(r.Line, "%s %s reads as a reference to feature %s: write %s/%s (an unqualified ID always means this spec's own)", r.Prefix, r.ID, r.Prefix, r.Prefix, r.ID)
 			continue
 		}
 		if !slices.Contains(kinds, KindOf(r.ID)) {

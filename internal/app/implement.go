@@ -212,7 +212,13 @@ func (a *App) Resume(ctx context.Context, arg string, discard, forceUnlock bool)
 
 // Clean removes the feature's worktree (the branch is kept).
 func (a *App) Clean(ctx context.Context, arg string, force bool) (msg string, err error) {
-	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) { msg, e = implement.Clean(ctx, s, force); return })
+	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) {
+		if msg, e = implement.Clean(ctx, s, force); e == nil && s.F.Merged() {
+			sha, note := a.commitRecords(ctx, s.F.Name, fmt.Sprintf("sdd(%s): records of the worktree cleanup", s.F.Name))
+			msg += "\n" + strings.TrimSuffix(FormatRecords(sha, note), "\n")
+		}
+		return
+	})
 	return
 }
 
@@ -254,12 +260,23 @@ func (a *App) Merge(ctx context.Context, arg string) (out Merged, err error) {
 
 // Validate runs the integration tests and every sync check of an implemented
 // feature and writes its report.
-func (a *App) Validate(ctx context.Context, arg string) (out validate.Result, err error) {
+func (a *App) Validate(ctx context.Context, arg string) (out Validation, err error) {
 	err = a.implementing(ctx, arg, func(s *implement.Session) (e error) {
-		out, e = validate.Validate(ctx, s.F, s.Who, s.Now, verify.Options{Timeout: a.Config.Limits.CommandTimeout, Tail: a.Config.Limits.OutputTail})
+		out.Result, e = validate.Validate(ctx, s.F, s.Who, s.Now, verify.Options{Timeout: a.Config.Limits.CommandTimeout, Tail: a.Config.Limits.OutputTail})
+		if e == nil && out.Merged {
+			// Nothing else will commit the records of a merged feature.
+			out.Records, out.Note = a.commitRecords(ctx, s.F.Name, fmt.Sprintf("sdd(%s): records of a validation after the merge", s.F.Name))
+		}
 		return
 	})
 	return
+}
+
+// Validation is the result of Validate.
+type Validation struct {
+	validate.Result
+	Records string // the commit of a merged feature's records, if one was made
+	Note    string // why they were not committed
 }
 
 // ReviewContext returns the brief for an agent-assisted deep review.

@@ -68,10 +68,19 @@ func SortIDs(ids []string) {
 	})
 }
 
-// ref is an ID mentioned in a document, with its line.
+// ref is an ID mentioned in a document, with its line. Prefix is the word
+// right before it (a possible feature name, as in "admin-api AC-018").
 type ref struct {
-	ID   string
-	Line int
+	ID     string
+	Line   int
+	Prefix string
+}
+
+// CrossRef is a reference to another feature's ID, written <feature>/<ID>.
+type CrossRef struct {
+	Feature string
+	ID      string
+	Line    int
 }
 
 // Meta is the common frontmatter.
@@ -130,7 +139,11 @@ type Functional struct {
 	lines     []markdown.Line
 	codeLines []int
 	refs      []ref
+	xrefs     []CrossRef
 }
+
+// CrossRefs returns the <feature>/<ID> references of the spec.
+func (f *Functional) CrossRefs() []CrossRef { return f.xrefs }
 
 // Commands are the verification commands declared by the technical spec.
 type Commands struct {
@@ -176,7 +189,11 @@ type Technical struct {
 
 	lines []markdown.Line
 	refs  []ref
+	xrefs []CrossRef
 }
+
+// CrossRefs returns the <feature>/<ID> references of the spec.
+func (t *Technical) CrossRefs() []CrossRef { return t.xrefs }
 
 // Components returns the components mapped to id in Requirement Traceability.
 func (t *Technical) Components(id string) []string { return targets(t.Traceability, id) }

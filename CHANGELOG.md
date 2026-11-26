@@ -8,6 +8,14 @@ To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sd
 
 ### Added
 - An unqualified `covers:` reference in a test file that another feature's plan also declares, to an ID both features define, is reported as ambiguous by `sdd sync check` and `sdd validate` (a warning that suggests `covers: <feature>/AC-###`).
+- **Errata after the merge.** Editing a merged feature's spec or plan keeps it `validated`; approving the edit (same IDs) restamps the derived artifacts instead of asking to re-approve the plan. An edit that adds, deletes or renumbers IDs is refused: new behavior goes in a new feature.
+- `sdd spec approve` and `sdd plan approve` refuse when the artifact was edited in the feature's worktree and differs from the project checkout's copy, which is the one they approve; `--from-worktree` copies the worktree's version first.
+- Spec lint reports an ID written right after another feature's name (`mock-domain FR-012`) and suggests `mock-domain/FR-012`; sync checks that a `<feature>/<ID>` reference names an existing feature that defines the ID.
+
+### Fixed
+- Re-approving the specs and plan of a merged feature moved it back to `plan-approved`, and `sdd status` suggested `sdd implement`. A merged feature now always shows as `validated` (states already affected are repaired when loaded).
+- `sdd validate` on a merged feature recreated the worktree from the old branch and left its records uncommitted. It now runs in the project checkout, removes a clean leftover worktree and commits the records; `sdd status` points to `sdd clean` when a worktree is left.
+- Unqualified `covers:` references in a test file shared by several features were reported as "not defined" or "ambiguous" in every feature that touched the file. In a file another feature's plan declares, a reference now belongs to the feature whose commit wrote the line (its `SDD-Feature` trailer, via `git blame`); only lines no feature wrote are still reported as ambiguous.
 
 ## v0.2.1 (2026-11-25)
 

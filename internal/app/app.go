@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"github.com/darkcarard/quipu-sdd/internal/trace"
 	"github.com/darkcarard/quipu-sdd/internal/validate"
 	"github.com/darkcarard/quipu-sdd/internal/workflow"
+	"github.com/darkcarard/quipu-sdd/internal/workspace"
 )
 
 // App is an initialized project.
@@ -454,13 +456,34 @@ type Approved struct {
 	Diagnostics     Report
 	Commit          string // the commit of the feature's specs and records, if one was made
 	CommitNote      string // why they were not committed
+	// Erratum is set when a merged feature's artifact was approved as an
+	// erratum; Restamped names the derived files kept approved with new hashes.
+	Erratum   bool
+	Restamped []string
 }
 
 // ErrBlocked is returned (with the diagnostics) when lint or sync errors block an approval.
 var ErrBlocked = feature.ErrBlocked
 
+// ApproveOptions tune an approval.
+type ApproveOptions struct {
+	// FromWorktree first copies the version of the artifact edited in the
+	// feature's worktree into the project checkout, then approves it.
+	FromWorktree bool
+}
+
+// ErrWorktreeVersion is returned when the artifact was edited in the feature's
+// worktree and that version differs from the project checkout's, which is the
+// one approvals read.
+var ErrWorktreeVersion = errors.New("the worktree has another version")
+
 // Approve freezes an artifact. It is a human-only operation: it is not exposed to agents.
 func (a *App) Approve(ctx context.Context, arg string, art workflow.Artifact) (Approved, error) {
+	return a.ApproveWith(ctx, arg, art, ApproveOptions{})
+}
+
+// ApproveWith is Approve with options.
+func (a *App) ApproveWith(ctx context.Context, arg string, art workflow.Artifact, opts ApproveOptions) (Approved, error) {
 	name, err := a.Resolve(arg)
 	if err != nil {
 		return Approved{}, err
@@ -475,6 +498,11 @@ func (a *App) Approve(ctx context.Context, arg string, art workflow.Artifact) (A
 		if err != nil {
 			return err
 		}
+		if who.Agent == "" {
+			if f, err = a.worktreeVersion(ctx, f, art, opts.FromWorktree); err != nil {
+				return err
+			}
+		}
 		ds, err := f.Approve(art, who, a.now())
 		out = Approved{Feature: f.Name, File: f.Files[art].Rel, Diagnostics: newReport(1, 1, ds)}
 		switch {
@@ -486,14 +514,65 @@ func (a *App) Approve(ctx context.Context, arg string, art workflow.Artifact) (A
 		}
 		appr := f.State.Approvals[art]
 		out.Hash, out.By, out.Phase, out.Next = appr.Hash, appr.By, string(f.Phase), f.Next()
+		out.Erratum = f.Merged()
+		for _, r := range f.Restamped {
+			out.Restamped = append(out.Restamped, feature.FileName(r))
+		}
 		what := "the " + string(art) + " spec"
 		if art == workflow.Plan {
 			what = "the plan"
+		}
+		if out.Erratum {
+			what = "an erratum to " + what
 		}
 		out.Commit, out.CommitNote = a.commitRecords(ctx, name, fmt.Sprintf("sdd(%s): approve %s", name, what))
 		return nil
 	})
 	return out, err
+}
+
+// worktreeVersion compares the artifact with the feature worktree's copy.
+// Approvals read the project checkout; a version edited in the worktree (it
+// differs from the branch's starting point) that is not the project's is
+// refused, or, with adopt, copied into the project checkout first.
+func (a *App) worktreeVersion(ctx context.Context, f *feature.Feature, art workflow.Artifact, adopt bool) (*feature.Feature, error) {
+	wtDir := a.Layout.WorktreeDir(f.Name)
+	rel := f.Files[art].Rel
+	wtContent, err := os.ReadFile(filepath.Join(wtDir, filepath.FromSlash(rel)))
+	if err != nil || f.Merged() {
+		if adopt {
+			return f, fmt.Errorf("--from-worktree: there is no %s in an open worktree of %s", rel, f.Name)
+		}
+		return f, nil // no worktree, or no copy of the file in it
+	}
+	if workflow.Hash(wtContent) == f.Files[art].Hash {
+		return f, nil
+	}
+	root := workspace.Git{Dir: a.Root}
+	base, err := root.Run(ctx, "merge-base", "HEAD", workspace.Branch(f.Name))
+	if err != nil {
+		return f, nil
+	}
+	if old, err := workspace.Open(a.Root, "").FileAt(ctx, base, rel); err == nil && workflow.Hash(old) == workflow.Hash(wtContent) {
+		return f, nil // the worktree still has the version it started from
+	}
+	if !adopt {
+		what := "the version that is already approved"
+		if f.Statuses[art] != workflow.StatusApproved {
+			what = "the project checkout's version"
+		}
+		flag := " --" + string(art)
+		cmd := "sdd spec approve " + f.Name + flag
+		if art == workflow.Plan {
+			cmd = "sdd plan approve " + f.Name
+		}
+		return f, fmt.Errorf("%w of %s: it was edited in .sdd/worktrees/%s, but approvals read the project checkout, so this would approve %s. Approve the worktree's version with `%s --from-worktree` (it is copied into the project checkout first), or discard the edit in the worktree",
+			ErrWorktreeVersion, rel, f.Name, what, cmd)
+	}
+	if err := state.WriteFileAtomic(f.Files[art].Path, wtContent, 0o644); err != nil {
+		return f, err
+	}
+	return feature.Load(a.Layout, a.Config, f.Name)
 }
 
 // Description is a feature's human-readable mapping.

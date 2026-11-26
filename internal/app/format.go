@@ -9,7 +9,6 @@ import (
 	"github.com/darkcarard/quipu-sdd/internal/feature"
 	"github.com/darkcarard/quipu-sdd/internal/implement"
 	"github.com/darkcarard/quipu-sdd/internal/trace"
-	"github.com/darkcarard/quipu-sdd/internal/validate"
 	"github.com/darkcarard/quipu-sdd/internal/verify"
 )
 
@@ -378,7 +377,7 @@ func stripFrontmatter(s string) string {
 }
 
 // FormatValidation renders the result of `sdd validate`.
-func FormatValidation(r validate.Result) string {
+func FormatValidation(r Validation) string {
 	var sb strings.Builder
 	if r.Skipped {
 		sb.WriteString("integration: skipped (no command)\n")
@@ -394,6 +393,16 @@ func FormatValidation(r validate.Result) string {
 		result = "FAILED"
 	}
 	fmt.Fprintf(&sb, "\nvalidation %s: %s, %s; report written to %s\n", result, Plural(errs, "error"), Plural(warns, "warning"), r.Report)
+	if r.Merged {
+		sb.WriteString("checked in the project checkout: the feature is already merged\n")
+	}
+	if r.Removed {
+		sb.WriteString("removed the leftover worktree; the branch is kept\n")
+	}
+	if r.Warning != "" {
+		fmt.Fprintf(&sb, "warning: %s\n", r.Warning)
+	}
+	sb.WriteString(FormatRecords(r.Records, r.Note))
 	fmt.Fprintf(&sb, "\nNext: %s\n", r.Next)
 	return sb.String()
 }

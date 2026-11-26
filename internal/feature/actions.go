@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -57,6 +58,8 @@ var (
 	ErrBlocked = errors.New("approval blocked by errors")
 	// ErrBaselinePlan is returned when a plan is created or approved for a baseline feature.
 	ErrBaselinePlan = errors.New("a baseline feature has no plan: it documents code that already exists; create a new feature (with depends_on) for new work")
+	// ErrErratumIDs is returned when an edit to a merged feature's spec or plan changes its IDs.
+	ErrErratumIDs = errors.New("a merged feature only takes errata")
 	// ErrHumanOnly is returned when an agent attempts a human-only action.
 	ErrHumanOnly = errors.New("approvals are human-only: ask the user to run the approval command")
 )
@@ -241,6 +244,12 @@ func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (dia
 	if f.Statuses[a] == workflow.StatusApproved {
 		return nil, ErrAlreadyApproved
 	}
+	erratum := f.Merged()
+	if erratum {
+		if err := f.checkErratum(a); err != nil {
+			return nil, err
+		}
+	}
 
 	jr, err := f.Journal()
 	if err != nil {
@@ -278,7 +287,7 @@ func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (dia
 
 	ds := f.Lint(a)
 	if a == workflow.Technical {
-		ds = append(ds, spec.CheckTechnical(f.Functional, f.Technical).InFile(file.Rel)...)
+		ds = append(ds, spec.CheckTechnical(f.Functional, f.Technical, f.otherFeatures()...).InFile(file.Rel)...)
 	}
 	if ds.HasErrors() {
 		n, _ := ds.Count()
@@ -308,18 +317,134 @@ func (f *Feature) Approve(a workflow.Artifact, who Identity, now time.Time) (dia
 	if err := f.reload(); err != nil {
 		return fail(err.Error(), err)
 	}
+	f.Restamped = nil
+	if erratum {
+		if err := f.restampDependents(a); err != nil {
+			return fail(err.Error(), err)
+		}
+	}
 	f.State.Phase = f.Phase
 	if err := f.Layout.Save(f.State); err != nil {
 		return fail(err.Error(), err)
 	}
 	f.Saved = true
+	detail := fmt.Sprintf("%s approved by %s", FileName(a), who)
+	if erratum {
+		detail += " (erratum of a merged feature)"
+		for _, d := range f.Restamped {
+			hashes[string(d)] = f.Files[d].Hash
+		}
+		if len(f.Restamped) > 0 {
+			detail += fmt.Sprintf("; %s restamped and kept approved", fileNames(f.Restamped))
+		}
+	}
 	if _, err := jr.End(started, journal.Completed, journal.Event{
 		Phase: string(f.Phase), IDs: append([]string{string(a)}, appr.IDs...), Hashes: hashes,
-		Detail: fmt.Sprintf("%s approved by %s", FileName(a), who),
+		Detail: detail,
 	}); err != nil {
 		return ds, err
 	}
 	return ds, f.RenderLog()
+}
+
+// checkErratum refuses an approval of a merged feature's artifact whose IDs
+// changed: its code is already integrated, so new or removed behavior belongs
+// in a new feature. Wording fixes, clarifications and retirements are errata.
+func (f *Feature) checkErratum(a workflow.Artifact) error {
+	var before, now []string
+	switch a {
+	case workflow.Functional:
+		before, now = f.State.Approvals[a].IDs, f.Functional.IDs()
+	case workflow.Technical:
+		before, now = f.State.Approvals[a].IDs, f.Technical.IDs()
+	case workflow.Plan:
+		for _, g := range f.State.Groups {
+			before = append(before, g.ID)
+			for _, t := range g.Tasks {
+				before = append(before, t.ID)
+			}
+		}
+		for _, g := range f.Plan.Groups {
+			now = append(now, g.ID)
+			for _, t := range g.Tasks {
+				now = append(now, t.ID)
+			}
+		}
+	}
+	if len(before) == 0 {
+		return nil // older approvals did not record their IDs
+	}
+	added, removed := diffIDs(before, now)
+	if len(added)+len(removed) == 0 {
+		return nil
+	}
+	var parts []string
+	if len(added) > 0 {
+		parts = append(parts, "adds "+strings.Join(added, ", "))
+	}
+	if len(removed) > 0 {
+		parts = append(parts, "removes "+strings.Join(removed, ", "))
+	}
+	return fmt.Errorf("%w: %s was merged into %s, and this version of %s %s. Keep the IDs (retire one with ~~ instead of deleting it) to approve the edit as an erratum, or describe the new behavior in a new feature with `depends_on: [%s]`",
+		ErrErratumIDs, f.Name, f.State.Merged.Into, FileName(a), strings.Join(parts, " and "), f.Name)
+}
+
+func diffIDs(before, now []string) (added, removed []string) {
+	for _, id := range now {
+		if !slices.Contains(before, id) {
+			added = append(added, id)
+		}
+	}
+	for _, id := range before {
+		if !slices.Contains(now, id) {
+			removed = append(removed, id)
+		}
+	}
+	return added, removed
+}
+
+// restampDependents keeps the artifacts derived from an approved erratum
+// approved: each one that is stale only because a source changed (its own
+// content is still the approved one) gets the new source hashes in its
+// frontmatter and approval, so an erratum never forces the plan to be
+// re-approved.
+func (f *Feature) restampDependents(src workflow.Artifact) error {
+	for _, d := range workflow.Artifacts() { // in dependency order: a restamped technical.md then restamps plan.md
+		if !slices.Contains(workflow.Sources(d), src) {
+			continue
+		}
+		if f.Statuses[d] != workflow.StatusStale {
+			continue // missing, approved, or edited itself: it needs its own approval
+		}
+		file := f.Files[d]
+		stamped, err := f.stamp(d, file.Content)
+		if err != nil {
+			return fmt.Errorf("%s: %w", file.Rel, err)
+		}
+		if err := state.WriteFileAtomic(file.Path, stamped, 0o644); err != nil {
+			return err
+		}
+		appr := f.State.Approvals[d]
+		appr.Hash = workflow.Hash(stamped)
+		appr.SourceHashes = map[workflow.Artifact]string{}
+		for _, s := range workflow.Sources(d) {
+			appr.SourceHashes[s] = f.Files[s].Hash
+		}
+		f.State.Approvals[d] = appr
+		if err := f.reload(); err != nil {
+			return err
+		}
+		f.Restamped = append(f.Restamped, d)
+	}
+	return nil
+}
+
+func fileNames(as []workflow.Artifact) string {
+	var names []string
+	for _, a := range as {
+		names = append(names, FileName(a))
+	}
+	return strings.Join(names, " and ")
 }
 
 // Record appends an event to the journal and regenerates log.md.

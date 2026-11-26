@@ -55,7 +55,7 @@ func ParseFunctional(content []byte) (*Functional, diag.List) {
 			f.OpenQuestions = openQuestions(s.Body)
 		}
 	}
-	f.refs = findRefs(doc.Lines)
+	f.refs, f.xrefs = findRefs(doc.Lines)
 	return f, ds
 }
 
@@ -184,17 +184,33 @@ func openQuestions(body []markdown.Line) []string {
 	return out
 }
 
-// findRefs returns every spec ID mentioned in lines, skipping cross-feature
-// references written as <feature>/<ID>.
-func findRefs(lines []markdown.Line) []ref {
+var (
+	// qualifiedRe matches the feature of a <feature>/<ID> reference, at the end of the text before the ID.
+	qualifiedRe = regexp.MustCompile(`(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)/$`)
+	// prefixRe matches the word before an ID ("admin-api AC-018", "`admin-api`'s AC-018").
+	prefixRe = regexp.MustCompile("(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:['’]s)?\\s+$")
+)
+
+// findRefs returns every spec ID mentioned in lines, and separately the
+// cross-feature references written as <feature>/<ID>.
+func findRefs(lines []markdown.Line) ([]ref, []CrossRef) {
 	var out []ref
+	var xs []CrossRef
 	for _, l := range lines {
 		for _, loc := range anyIDRe.FindAllStringIndex(l.Text, -1) {
-			if loc[0] > 0 && l.Text[loc[0]-1] == '/' {
+			id, before := l.Text[loc[0]:loc[1]], l.Text[:loc[0]]
+			if strings.HasSuffix(before, "/") {
+				if m := qualifiedRe.FindStringSubmatch(before); m != nil {
+					xs = append(xs, CrossRef{Feature: m[1], ID: id, Line: l.N})
+				}
 				continue
 			}
-			out = append(out, ref{ID: l.Text[loc[0]:loc[1]], Line: l.N})
+			r := ref{ID: id, Line: l.N}
+			if m := prefixRe.FindStringSubmatch(before); m != nil {
+				r.Prefix = m[1]
+			}
+			out = append(out, r)
 		}
 	}
-	return out
+	return out, xs
 }

@@ -130,7 +130,7 @@ The feature state is stored in `.sdd/features/<feature>/state.json`:
 | `validated` | Integration tests and sync checks pass | — (`sdd merge` records the merge; the phase stays) |
 | `baselined` | Baseline feature: both specs approved, describing code that already exists (no plan, no implementation) | a revision of the baseline specs |
 
-Up to `plan-approved`, the phase is **derived from the artifacts**: their existence, the approvals in `state.json` and the current content hashes (see the staleness rule below). Editing a file by hand or pulling a teammate's changes is therefore always reflected by `sdd status`, and an edited or stale artifact reopens its `*-drafting` phase. From `implementing` onwards, the phase stored in `state.json` is kept as long as every artifact is still approved. When the specs or the plan of a feature whose implementation already started are edited and re-approved (before `sdd merge`), the feature returns to `implemented` if every group of the plan is still approved, or to `implementing` otherwise (for example, the plan gained a group); a validated feature must be validated again. The stored phase is updated on the next command that writes state, such as an approval.
+Up to `plan-approved`, the phase is **derived from the artifacts**: their existence, the approvals in `state.json` and the current content hashes (see the staleness rule below). Editing a file by hand or pulling a teammate's changes is therefore always reflected by `sdd status`, and an edited or stale artifact reopens its `*-drafting` phase. From `implementing` onwards, the phase stored in `state.json` is kept as long as every artifact is still approved. When the specs or the plan of a feature whose implementation already started are edited and re-approved (before `sdd merge`), the feature returns to `implemented` if every group of the plan is still approved, or to `implementing` otherwise (for example, the plan gained a group); a validated feature must be validated again. The stored phase is updated on the next command that writes state, such as an approval. A merged feature always stays `validated`: an edit to its specs or plan is an erratum (see [Errata after the merge](#errata-after-the-merge)).
 
 **Group states:** `pending → in-progress → awaiting-review → approved`. A `sdd revise` request sends a group from `awaiting-review` back to `in-progress`.
 
@@ -156,6 +156,8 @@ If a source changes after approval, every artifact that depends on it becomes **
 | `/sdd-tech <feature>` | user → agent | Draft the technical spec. Only allowed after functional approval |
 | `sdd spec new <feature> --technical` | user or agent | Create `technical.md` from the template |
 | `sdd spec approve <feature> --technical` | **user** | Freeze the technical spec (lint + sync must pass) |
+
+Approvals read the project checkout (`specs/<feature>/`), never the feature's worktree. If the artifact was edited in the worktree and that version differs from the project's, `sdd spec approve` and `sdd plan approve` refuse instead of approving (or reporting "already approved" for) the other version; add `--from-worktree` to copy the worktree's version into the project checkout and approve it.
 
 The drafting loop:
 1. The agent calls `guide` for the guidelines and the template, and `spec_new` if the artifact does not exist yet.
@@ -258,11 +260,17 @@ The report records the verdict, who validated and when, the branch commit, the a
 
 After validation, `sdd merge <feature>` (or just `sdd merge` when only one feature is validated) merges `sdd/<feature>` into the branch checked out in the project, whatever directory it runs from: a fast-forward when possible, otherwise a merge commit; a merge with conflicts is aborted and nothing changes. It refuses if the branch moved since validation or the worktree has uncommitted changes. Then it removes the worktree (the branch is kept: delete it with `git branch -d` when you no longer need it), records the merge in `state.json` and the journal, and commits the feature's records. To merge your own way (a pull request, a rebase), do it and then run `sdd merge <feature>` anyway: when the validated work is already in the checked-out branch (even if `sdd/<feature>` was deleted), it merges nothing and only records the merge, removes the worktree and commits the records. `sdd clean` succeeds when there is no worktree left.
 
+### Errata after the merge
+
+Once merged, a feature's code is part of the project, so its specs can still be corrected but its behavior cannot change through them. An edit to a merged feature's spec or plan is an **erratum**: the feature stays `validated`, `sdd status` names the edited file, and the user approves it as usual (`sdd spec approve <feature> --technical`). The approval checks that the IDs did not change (retiring one with `~~` is allowed; adding, deleting or renumbering is refused: describe new behavior in a new feature with `depends_on: [<feature>]`), then refreshes the source hashes of the artifacts derived from it (`plan.md`, and `technical.md` after a functional erratum) and keeps them approved, so the plan is not re-approved. That restamp changes one frontmatter line in each derived file; the approval commit includes it. `sdd implement` refuses a merged feature.
+
+`sdd validate` on a merged feature runs the integration command and the checks in the project checkout (its code now lives there), removes a leftover worktree that has no uncommitted changes, and commits the feature's records. `sdd clean` on a merged feature also commits them.
+
 Sync levels, each applied as soon as its artifacts exist:
 - **spec ↔ spec:** `functional_hash` matches, every FR, NFR and AC is mapped in the technical spec, every ID the technical spec references exists in the functional spec, and every `depends_on` feature exists.
 - **spec ↔ plan:** both source hashes match, every FR and AC is covered by a task, and every covered ID exists and is not retired.
 - **approvals:** an artifact edited after its approval (`modified`) or whose sources changed after its approval (`stale`) is an error until it is re-approved.
-- **plan ↔ code:** every approved group has exactly one commit on `sdd/<feature>` whose `SDD-Group` and `SDD-Tasks` trailers match the plan (a different `SDD-Covers` is a warning); commits on the branch without SDD trailers are reported as made outside `sdd`; every AC of an approved group is referenced by at least one test (`covers: AC-###`, counted only in files the feature changed unless qualified as `covers: <feature>/AC-###`; an unqualified reference in a file another feature's plan also declares, to an ID both define, is an ambiguity warning), and a reference to an unknown or retired ID is a warning. Test references are searched with `git grep` in every file git sees (outside `specs/` and `.sdd/`), in the worktree or, once it is removed, in the project.
+- **plan ↔ code:** every approved group has exactly one commit on `sdd/<feature>` whose `SDD-Group` and `SDD-Tasks` trailers match the plan (a different `SDD-Covers` is a warning); commits on the branch without SDD trailers are reported as made outside `sdd`; every AC of an approved group is referenced by at least one test (`covers: AC-###`, counted only in files the feature changed unless qualified as `covers: <feature>/AC-###`; in a file another feature's plan also declares, an unqualified reference belongs to the feature whose commit wrote the line, by its `SDD-Feature` trailer; one no feature wrote, to an ID both define, is an ambiguity warning), and a reference to an unknown or retired ID is a warning. Test references are searched with `git grep` in every file git sees (outside `specs/` and `.sdd/`), in the worktree or, once it is removed, in the project.
 
 The deep review ("does the code actually satisfy AC-003?") is done by the agent from `review_context`. It only produces a report and never blocks a gate.
 
@@ -295,7 +303,8 @@ Afterwards:
 
 `sdd` commits a feature's records, `specs/<feature>/` and `.sdd/features/<feature>/` (specs, plan, state, journal, log, report), on the branch checked out in the project:
 - on every approval of a spec or the plan (`sdd(<feature>): approve the functional spec`), so approved specs reach every clone, and `sdd implement` branches from a commit that contains them;
-- on `sdd merge`, after the merge (`sdd(<feature>): records of the merge into <branch>`), with the group approvals, the validation report and any deep review.
+- on `sdd merge`, after the merge (`sdd(<feature>): records of the merge into <branch>`), with the group approvals, the validation report and any deep review;
+- after the merge, on every erratum approval, `sdd validate` and `sdd clean` of the feature.
 
 Only those two paths are committed: whatever else you have staged stays staged. The commits carry an `SDD-Feature` trailer. Outside a git repository, or if the commit fails, the approval still succeeds and `sdd` says what to commit by hand.
 
@@ -306,7 +315,7 @@ sdd init [--agent claude|generic] [--check] [--force] | version | status [<featu
 sdd adopt --context
 sdd feature describe <feature> [--title "<title>"] [--description "<text>"]
 sdd spec new [--technical|--baseline]|lint|approve
-sdd plan new <feature> | plan approve <feature>
+sdd plan new <feature> | plan approve <feature> [--from-worktree]
 sdd implement | resume | clean <feature>
 sdd review | approve | revise [<group>|<feature>]   ·   sdd merge [<feature>]
                                   (review: --diff | --no-open | --context)

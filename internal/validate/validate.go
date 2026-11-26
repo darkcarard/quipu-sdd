@@ -98,6 +98,9 @@ func ScanTests(ctx context.Context, dir string) ([]TestRef, error) {
 // codeDir is where the feature's code is: its worktree, or (after the branch
 // was merged and the worktree removed) the project itself.
 func codeDir(f *feature.Feature) string {
+	if f.Merged() {
+		return f.Layout.Root
+	}
 	wt := f.Layout.WorktreeDir(f.Name)
 	if _, err := os.Stat(wt); err == nil {
 		return wt
@@ -205,10 +208,29 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 	if err != nil {
 		return ds, links, err
 	}
+	authors := lineAuthors{git: workspace.Git{Dir: codeDir(f)}, features: map[string]string{}}
 	for _, r := range refs {
 		for _, id := range r.For(f.Name) {
-			if !own[r.File] && !slices.Contains(r.IDs, f.Name+"/"+id) {
+			qualified := slices.Contains(r.IDs, f.Name+"/"+id)
+			if !own[r.File] && !qualified {
 				continue
+			}
+			var others []string
+			if !qualified {
+				others = sharers(r.File, id)
+			}
+			if len(others) > 0 {
+				// A file shared with other features: the commit that wrote the
+				// line says whose reference it is (its SDD-Feature trailer).
+				switch author := authors.of(ctx, r.File, r.Line); {
+				case author == f.Name:
+					others = nil
+				case slices.Contains(others, author):
+					continue
+				}
+			}
+			if _, defined := lookup(f, id); !defined && len(others) > 0 {
+				continue // another feature's test in a shared file: its ID, not an unknown one of this feature
 			}
 			loc := fmt.Sprintf("%s:%d", r.File, r.Line)
 			if !slices.Contains(links.Tests[id], loc) {
@@ -217,8 +239,8 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 			if f.Functional == nil {
 				continue
 			}
-			if !slices.Contains(r.IDs, f.Name+"/"+id) {
-				if others := sharers(r.File, id); len(others) > 0 {
+			if !qualified {
+				if len(others) > 0 {
 					ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: r.File, Line: r.Line,
 						Message: fmt.Sprintf("ambiguous covers %s: this file is also in the plan of %s, which defines %s; qualify it as %s/%s",
 							id, strings.Join(others, ", "), id, f.Name, id)})
@@ -255,6 +277,41 @@ func CheckCode(ctx context.Context, f *feature.Feature) (diag.List, trace.Links,
 		}
 	}
 	return ds, links, nil
+}
+
+func lookup(f *feature.Feature, id string) (spec.Definition, bool) {
+	if f.Functional == nil {
+		return spec.Definition{}, false
+	}
+	return f.Functional.Lookup(id)
+}
+
+// lineAuthors finds the feature that wrote a line: the SDD-Feature trailer of
+// the commit that last changed it (git blame). Uncommitted lines and commits
+// made outside sdd have no author.
+type lineAuthors struct {
+	git      workspace.Git
+	features map[string]string // commit → feature
+}
+
+func (a lineAuthors) of(ctx context.Context, file string, line int) string {
+	out, err := a.git.Run(ctx, "blame", "--porcelain", "-L", fmt.Sprintf("%d,%d", line, line), "--", file)
+	if err != nil {
+		return ""
+	}
+	sha, _, _ := strings.Cut(out, " ")
+	if strings.Trim(sha, "0") == "" {
+		return "" // not committed yet
+	}
+	if name, ok := a.features[sha]; ok {
+		return name
+	}
+	name, err := a.git.Run(ctx, "log", "-1", "--format=%(trailers:key=SDD-Feature,valueonly,separator=)", sha)
+	if err != nil {
+		name = ""
+	}
+	a.features[sha] = strings.TrimSpace(name)
+	return a.features[sha]
 }
 
 // planSharers returns a lookup of the other features whose plan declares a
@@ -328,7 +385,7 @@ func featureFiles(ctx context.Context, f *feature.Feature, base, ref string, com
 			files[line] = true
 		}
 	}
-	if wt := workspace.Open(f.Layout.WorktreeDir(f.Name), ref); wt.Exists() {
+	if wt := workspace.Open(f.Layout.WorktreeDir(f.Name), ref); wt.Exists() && !f.Merged() {
 		changed, err := wt.Changed(ctx)
 		if err != nil {
 			return nil, err
@@ -391,6 +448,13 @@ type Result struct {
 	Report      string // path relative to the project root
 	Head        string
 	Next        string
+	// Merged is set for a feature already merged: it was validated in the
+	// project checkout, whose records the caller commits.
+	Merged bool
+	// Removed is set when a leftover worktree of a merged feature was removed;
+	// Warning says why it was kept, if it was.
+	Removed bool
+	Warning string
 }
 
 // Validate runs the integration tests and every sync check of an implemented
@@ -406,11 +470,22 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 	if f.Technical == nil {
 		return out, errors.New("technical.md is missing")
 	}
-	wt, _, err := workspace.Ensure(ctx, f.Layout.Root, f.Layout.WorktreeDir(f.Name), f.Name)
-	if err != nil {
-		return out, err
+	// A merged feature is checked where its code now is, the project
+	// checkout; recreating its worktree from the old branch would test stale code.
+	dir := f.Layout.Root
+	if out.Merged = f.Merged(); out.Merged {
+		out.Head, _ = workspace.Git{Dir: dir}.Run(ctx, "rev-parse", "HEAD")
+		if wt := workspace.Open(f.Layout.WorktreeDir(f.Name), workspace.Branch(f.Name)); wt.Exists() {
+			out.Removed, out.Warning = removeLeftover(ctx, f, wt, who)
+		}
+	} else {
+		wt, _, err := workspace.Ensure(ctx, f.Layout.Root, f.Layout.WorktreeDir(f.Name), f.Name)
+		if err != nil {
+			return out, err
+		}
+		dir = wt.Dir
+		out.Head, _ = wt.Head(ctx)
 	}
-	out.Head, _ = wt.Head(ctx)
 
 	jr, err := f.Journal()
 	if err != nil {
@@ -420,7 +495,7 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 	if err != nil {
 		return out, err
 	}
-	results, ok := verify.Run(ctx, wt.Dir, opts, verify.Step{Name: "integration", Command: f.Technical.Commands.Integration})
+	results, ok := verify.Run(ctx, dir, opts, verify.Step{Name: "integration", Command: f.Technical.Commands.Integration})
 	out.Integration, out.Skipped = results, len(results) == 0
 
 	ix, codeDs, err := Index(ctx, f)
@@ -451,7 +526,7 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 		return out, err
 	}
 	_ = f.RenderLog()
-	if out.Passed {
+	if out.Passed && !out.Merged {
 		f.State.ValidatedSHA = out.Head
 		if f.Phase == workflow.Implemented {
 			f.SetPhase(workflow.Validated)
@@ -465,6 +540,25 @@ func Validate(ctx context.Context, f *feature.Feature, who feature.Identity, now
 		out.Next = fmt.Sprintf("fix the problems in %s (or revise the specs), then run `sdd validate %s` again", out.Report, f.Name)
 	}
 	return out, nil
+}
+
+// removeLeftover removes the worktree of a merged feature (left by an older
+// sdd or a later `sdd implement`) when it has no uncommitted changes.
+func removeLeftover(ctx context.Context, f *feature.Feature, wt *workspace.Worktree, who feature.Identity) (bool, string) {
+	dirty, err := wt.Changed(ctx)
+	switch {
+	case err != nil:
+		return false, fmt.Sprintf("the leftover worktree %s was kept: %v", f.State.Worktree, err)
+	case len(dirty) > 0:
+		return false, fmt.Sprintf("the leftover worktree .sdd/worktrees/%s was kept: it has uncommitted changes (%s); remove it with `sdd clean %s --force` if you do not need them",
+			f.Name, strings.Join(dirty, ", "), f.Name)
+	}
+	if err := workspace.Remove(ctx, f.Layout.Root, wt.Dir, false); err != nil {
+		return false, fmt.Sprintf("the leftover worktree was kept: %v", err)
+	}
+	_ = f.Record(journal.Event{Actor: who.Actor(), RunID: f.State.RunID, Phase: string(f.Phase), Action: "worktree.clean",
+		Status: journal.Info, Detail: "removed the worktree of a merged feature"})
+	return true, ""
 }
 
 func reportRel(f *feature.Feature) string {

@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -56,6 +57,9 @@ type Feature struct {
 	Statuses map[workflow.Artifact]workflow.ArtifactStatus
 	// Phase is the effective phase (see workflow.Effective); State.Phase is what was last saved.
 	Phase workflow.Phase
+	// Restamped lists the artifacts whose source hashes the last Approve of an
+	// erratum refreshed (and kept approved).
+	Restamped []workflow.Artifact
 }
 
 // List returns the names of every feature in the project (from specs/ and .sdd/features/), sorted.
@@ -141,12 +145,46 @@ func (f *Feature) reload() error {
 	}
 	f.Statuses = workflow.Evaluate(f.State.Approvals, current)
 	f.Phase = workflow.EffectiveFor(f.State.Phase, f.Statuses, f.Baseline())
+	if f.Merged() {
+		// A merged feature stays validated: an edited spec is an erratum (see Approve).
+		f.Phase = workflow.Validated
+		return nil
+	}
 	if f.Phase == workflow.PlanApproved {
 		if p, ok := f.implementationPhase(); ok {
 			f.Phase = p
 		}
 	}
 	return nil
+}
+
+// Merged reports whether the feature's branch was merged with `sdd merge`.
+func (f *Feature) Merged() bool { return f.State.Merged != nil && !f.Baseline() }
+
+// Errata returns the artifacts of a merged feature that wait for the user to
+// approve them as errata: edited after their approval, or stale with every
+// source approved (left so by an older sdd).
+func (f *Feature) Errata() []workflow.Artifact {
+	if !f.Merged() {
+		return nil
+	}
+	var out []workflow.Artifact
+	for _, a := range workflow.Artifacts() {
+		switch f.Statuses[a] {
+		case workflow.StatusModified:
+			out = append(out, a)
+		case workflow.StatusStale:
+			// Stale only because of a pending erratum: approving that one restamps it.
+			pending := false
+			for _, src := range workflow.Sources(a) {
+				pending = pending || f.Statuses[src] != workflow.StatusApproved
+			}
+			if !pending {
+				out = append(out, a)
+			}
+		}
+	}
+	return out
 }
 
 // implementationPhase is the phase an unmerged feature whose implementation
@@ -183,7 +221,7 @@ func (f *Feature) Lint(a workflow.Artifact) diag.List {
 		return nil
 	}
 	ds := append(diag.List(nil), f.parseDiags[a]...)
-	opts := spec.LintOptions{Feature: f.Name, PreviousIDs: f.State.Approvals[a].IDs}
+	opts := spec.LintOptions{Feature: f.Name, PreviousIDs: f.State.Approvals[a].IDs, OtherFeatures: f.otherFeatures()}
 	var more diag.List
 	switch a {
 	case workflow.Functional:
@@ -245,7 +283,7 @@ func (f *Feature) Sync() diag.List {
 			if f.Statuses[workflow.Technical] != workflow.StatusStale { // stale already explains a mismatch
 				ds = append(ds, sourceHash(tech.Rel, "functional_hash", f.Technical.FunctionalHash, fn.Hash)...)
 			}
-			ds = append(ds, spec.CheckTechnical(f.Functional, f.Technical).InFile(tech.Rel)...)
+			ds = append(ds, spec.CheckTechnical(f.Functional, f.Technical, f.otherFeatures()...).InFile(tech.Rel)...)
 		}
 	}
 	if f.Plan != nil {
@@ -261,6 +299,7 @@ func (f *Feature) Sync() diag.List {
 			ds = append(ds, plan.CheckCoverage(f.Plan, f.Functional).InFile(pl.Rel)...)
 		}
 	}
+	ds = append(ds, f.checkCrossRefs()...)
 	for _, a := range workflow.Artifacts() {
 		file := f.Files[a]
 		switch f.Statuses[a] {
@@ -272,6 +311,62 @@ func (f *Feature) Sync() diag.List {
 		}
 	}
 	return ds
+}
+
+// otherFeatures returns the names of the project's other features.
+func (f *Feature) otherFeatures() []string {
+	names, _ := List(f.Layout)
+	return slices.DeleteFunc(names, func(n string) bool { return n == f.Name })
+}
+
+// checkCrossRefs checks the <feature>/<ID> references of both specs: the
+// feature must exist and define the ID.
+func (f *Feature) checkCrossRefs() diag.List {
+	var ds diag.List
+	loaded := map[string]*Feature{}
+	check := func(file string, xs []spec.CrossRef) {
+		for _, x := range xs {
+			if x.Feature == f.Name {
+				continue // a self-qualified ID is checked like any other
+			}
+			o, ok := loaded[x.Feature]
+			if !ok {
+				if ValidName(x.Feature) == nil {
+					o, _ = Load(f.Layout, f.Config, x.Feature)
+				}
+				loaded[x.Feature] = o
+			}
+			var found bool
+			switch {
+			case o == nil:
+				ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: file, Line: x.Line,
+					Message: fmt.Sprintf("%s/%s: feature %q does not exist", x.Feature, x.ID, x.Feature)})
+				continue
+			case spec.KindOf(x.ID) == spec.KindADR:
+				found = o.Technical != nil && slices.Contains(o.Technical.IDs(), x.ID)
+			default:
+				_, found = lookup(o.Functional, x.ID)
+			}
+			if !found {
+				ds = append(ds, diag.Diagnostic{Severity: diag.Warning, File: file, Line: x.Line,
+					Message: fmt.Sprintf("%s/%s: %s is not defined in specs/%s", x.Feature, x.ID, x.ID, x.Feature)})
+			}
+		}
+	}
+	if f.Functional != nil {
+		check(f.Files[workflow.Functional].Rel, f.Functional.CrossRefs())
+	}
+	if f.Technical != nil {
+		check(f.Files[workflow.Technical].Rel, f.Technical.CrossRefs())
+	}
+	return ds
+}
+
+func lookup(fn *spec.Functional, id string) (spec.Definition, bool) {
+	if fn == nil {
+		return spec.Definition{}, false
+	}
+	return fn.Lookup(id)
 }
 
 func (f *Feature) changedSources(a workflow.Artifact) string {
@@ -400,6 +495,13 @@ func (f *Feature) Next() string {
 		return fmt.Sprintf("nothing: the baseline is approved. New features that build on this code declare `depends_on: [%s]`; if one changes adopted behavior, revise this baseline's specs and re-approve them", n)
 	case workflow.Validated:
 		if m := f.State.Merged; m != nil {
+			if errata := f.Errata(); len(errata) > 0 {
+				a := errata[0]
+				return fmt.Sprintf("specs/%s/%s was edited after the merge: review the erratum, then the user approves it with `%s` (the feature stays validated; derived artifacts are restamped, not re-approved)", n, FileName(a), ApproveCommand(n, a))
+			}
+			if _, err := os.Stat(f.Layout.WorktreeDir(n)); err == nil {
+				return fmt.Sprintf("nothing to implement: sdd/%s was merged into %s. Remove the leftover worktree with `sdd clean %s`; if the branch still exists, delete it with `git branch -d sdd/%s`", n, m.Into, n, n)
+			}
 			return fmt.Sprintf("nothing: sdd/%s was merged into %s; if the branch still exists, delete it with `git branch -d sdd/%s` once you no longer need it", n, m.Into, n)
 		}
 		return fmt.Sprintf("merge it with `sdd merge %s` (into the branch checked out in the project, from any directory; removes the worktree), or merge sdd/%s your own way (PR, rebase) and then run `sdd merge %s` to record it", n, n, n)

@@ -2,6 +2,7 @@ package feature
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -323,5 +324,30 @@ func TestBaselineFeature(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("an unapproved baseline dependency must be reported: %v", ck.Sync())
+	}
+}
+
+// References to other features' IDs: <feature>/<ID> is checked against that
+// feature by sync; "<feature> <ID>" is reported by lint as one to qualify.
+func TestCrossFeatureReferences(t *testing.T) {
+	l := setup(t)
+	other := filepath.Join(l.SpecDir("mock-domain"), "functional.md")
+	os.MkdirAll(filepath.Dir(other), 0o755)
+	os.WriteFile(other, []byte(sddtest.Functional), 0o644)
+	write(t, l, workflow.Functional, strings.Replace(sddtest.Functional, "(see AC-001)",
+		"(see AC-001, mock-domain/FR-002, mock-domain/FR-012, ghost/AC-001 and mock-domain AC-007)", 1))
+
+	f := load(t, l)
+	lint, sync := fmt.Sprint(f.Lint(workflow.Functional)), fmt.Sprint(f.Sync())
+	for _, w := range []string{"mock-domain/FR-012: FR-012 is not defined in specs/mock-domain", `ghost/AC-001: feature "ghost" does not exist`} {
+		if !strings.Contains(sync, w) {
+			t.Errorf("sync: want %q, got:\n%s", w, sync)
+		}
+	}
+	if strings.Contains(sync, "FR-002") {
+		t.Errorf("a defined cross reference was reported:\n%s", sync)
+	}
+	if !strings.Contains(lint, "mock-domain AC-007 reads as a reference to feature mock-domain") || strings.Contains(lint, "AC-007 is referenced but not defined") {
+		t.Errorf("lint:\n%s", lint)
 	}
 }

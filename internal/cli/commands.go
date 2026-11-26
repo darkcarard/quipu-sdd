@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strings"
 
 	"github.com/darkcarard/quipu-sdd/internal/app"
 	"github.com/darkcarard/quipu-sdd/internal/mcpserver"
@@ -88,7 +89,7 @@ func (a *App) runMCP(ctx context.Context, args []string) error {
 const specUsage = `sdd spec new <feature or "Free text title"> [--name <feature>] [--title "<title>"] [--description "<text>"] [--baseline]
        sdd spec new <feature> --technical
        sdd spec lint [<feature>]
-       sdd spec approve <feature> --functional|--technical`
+       sdd spec approve <feature> --functional|--technical [--from-worktree]`
 
 func (a *App) runSpec(ctx context.Context, args []string) error {
 	if len(args) == 0 {
@@ -173,6 +174,7 @@ func (a *App) runSpecApprove(ctx context.Context, args []string) error {
 	fs := a.newFlagSet("spec approve")
 	functional := fs.Bool("functional", false, "approve functional.md")
 	technical := fs.Bool("technical", false, "approve technical.md")
+	fromWT := fs.Bool("from-worktree", false, "approve the version edited in the feature's worktree (copied into the project checkout first)")
 	pos, err := parseArgs(fs, args)
 	if err != nil {
 		return err
@@ -185,19 +187,19 @@ func (a *App) runSpecApprove(ctx context.Context, args []string) error {
 		art = workflow.Technical
 	}
 	if len(pos) != 1 || art == "" {
-		return a.usageErr("sdd spec approve <feature> --functional|--technical")
+		return a.usageErr("sdd spec approve <feature> --functional|--technical [--from-worktree]")
 	}
-	return a.approve(ctx, pos[0], art)
+	return a.approve(ctx, pos[0], art, app.ApproveOptions{FromWorktree: *fromWT})
 }
 
 // approve freezes an artifact and reports the outcome. Approvals are human-only:
 // they exist only in the CLI, never as MCP tools.
-func (a *App) approve(ctx context.Context, arg string, art workflow.Artifact) error {
+func (a *App) approve(ctx context.Context, arg string, art workflow.Artifact, opts app.ApproveOptions) error {
 	p, err := a.open()
 	if err != nil {
 		return err
 	}
-	r, err := p.Approve(ctx, arg, art)
+	r, err := p.ApproveWith(ctx, arg, art, opts)
 	fmt.Fprint(a.Stdout, app.FormatDiagnostics(r.Diagnostics))
 	switch {
 	case errors.Is(err, app.ErrBlocked):
@@ -210,13 +212,20 @@ func (a *App) approve(ctx context.Context, arg string, art workflow.Artifact) er
 		return nil
 	}
 	fmt.Fprintf(a.Stdout, "approved %s (%s) by %s\n", r.File, app.Short(r.Hash), r.By)
+	if r.Erratum {
+		fmt.Fprintf(a.Stdout, "erratum of a merged feature: the phase stays %s", r.Phase)
+		if len(r.Restamped) > 0 {
+			fmt.Fprintf(a.Stdout, "; %s restamped with the new hashes and kept approved", strings.Join(r.Restamped, " and "))
+		}
+		fmt.Fprintln(a.Stdout)
+	}
 	fmt.Fprint(a.Stdout, app.FormatRecords(r.Commit, r.CommitNote))
 	fmt.Fprintf(a.Stdout, "phase:   %s\n\nNext: %s\n", r.Phase, r.Next)
 	return nil
 }
 
 const planUsage = `sdd plan new <feature>
-       sdd plan approve <feature>`
+       sdd plan approve <feature> [--from-worktree]`
 
 func (a *App) runPlan(ctx context.Context, args []string) error {
 	if len(args) == 0 {
@@ -225,6 +234,10 @@ func (a *App) runPlan(ctx context.Context, args []string) error {
 	switch args[0] {
 	case "new", "approve":
 		fs := a.newFlagSet("plan " + args[0])
+		var fromWT *bool
+		if args[0] == "approve" {
+			fromWT = fs.Bool("from-worktree", false, "approve the version edited in the feature's worktree (copied into the project checkout first)")
+		}
 		pos, err := parseArgs(fs, args[1:])
 		if err != nil {
 			return err
@@ -233,7 +246,7 @@ func (a *App) runPlan(ctx context.Context, args []string) error {
 			return a.usageErr("sdd plan " + args[0] + " <feature>")
 		}
 		if args[0] == "approve" {
-			return a.approve(ctx, pos[0], workflow.Plan)
+			return a.approve(ctx, pos[0], workflow.Plan, app.ApproveOptions{FromWorktree: *fromWT})
 		}
 		p, err := a.open()
 		if err != nil {

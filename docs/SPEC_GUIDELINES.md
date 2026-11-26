@@ -42,7 +42,7 @@ These are the rules every spec and plan must follow. Items marked **[lint]** are
 - IDs are unique within a feature and are **never reused or renumbered**. Retire an ID by striking it through rather than deleting it: `### ~~FR-004~~ (removed)` for a requirement, `- ~~AC-007~~ (removed)` for a criterion. Each approval records the IDs it approved, so an approved ID that later disappears is reported. **[lint]**
 - Number IDs with three digits, sequentially, in order of creation. Malformed IDs (`FR-1`) and gaps in the numbering are reported. **[lint]**
 - Every ID that is referenced must be defined. Referencing a retired ID is a warning. **[lint]**
-- Outside its feature, an ID is referred to as `<feature>/<ID>`.
+- Outside its feature, an ID is referred to as `<feature>/<ID>` (`mock-domain/FR-012`). An unqualified ID always means the spec's own: an ID written right after another feature's name (`mock-domain FR-012`, `` `admin-api`'s AC-018 ``) is reported so it can be qualified, instead of being checked against this spec. **[lint, warning]** A qualified reference must name an existing feature that defines the ID. **[lint: sync, warning]**
 
 ## Functional Spec (`functional.md`)
 
@@ -144,7 +144,7 @@ func TestSignup_RejectsDuplicateEmail(t *testing.T) { … }
 
 The marker is `covers:` (any case) followed by one or more IDs on the same line (`# covers: AC-001, AC-002` in Python, `// covers: AC-003` in TypeScript, and so on). Any file git sees counts, except those under `specs/` and `.sdd/`. Every AC of an approved group needs at least one reference **[lint: sync]**.
 
-IDs are numbered per feature, so a reference counts for a feature only in files that feature changed (its group commits, plus uncommitted changes in its worktree): another feature's `covers: AC-001` is not taken for this one's `AC-001`. To reference a criterion from a file the feature did not change, or in a test file shared by several features, qualify it: `covers: user-signup/AC-003`. A qualified reference counts only for the feature it names. An unqualified reference in a file that another feature's plan also declares, to an ID that feature also defines, is reported as ambiguous **[lint: sync, warning]**: qualify it.
+IDs are numbered per feature, so a reference counts for a feature only in files that feature changed (its group commits, plus uncommitted changes in its worktree): another feature's `covers: AC-001` is not taken for this one's `AC-001`. To reference a criterion from a file the feature did not change, or in a test file shared by several features, qualify it: `covers: user-signup/AC-003`. A qualified reference counts only for the feature it names. In a file that another feature's plan also declares, an unqualified reference belongs to the feature whose commit last wrote that line (its `SDD-Feature` trailer, found with `git blame`), so each feature's tests keep counting for it. When no feature wrote the line (it is not committed yet, or was committed outside sdd) and the other feature defines the ID too, it is reported as ambiguous **[lint: sync, warning]**: qualify it. If only the other feature defines the ID, the reference is taken as that feature's and not reported.
 
 ## Approval and Sync Rules
 
