@@ -31,6 +31,7 @@ func LintFunctional(f *Functional, opts LintOptions) diag.List {
 	lintMeta(f.Meta, opts.Feature, &ds)
 	lintSections(f.Sections, FunctionalSections, &ds)
 	lintIDs(f.Defined, f.refs, opts, []Kind{KindFR, KindNFR, KindAC}, &ds)
+	lintListed(f.xrefs, &ds)
 
 	active := 0
 	for _, r := range f.Requirements {
@@ -104,6 +105,7 @@ func LintTechnical(t *Technical, opts LintOptions) diag.List {
 	}
 	lintSections(t.Sections, TechnicalSections, &ds)
 	lintIDs(t.Defined, t.refs, opts, []Kind{KindADR}, &ds)
+	lintListed(t.xrefs, &ds)
 
 	for _, m := range t.Traceability {
 		lintMapping(m, secTraceability, []Kind{KindFR, KindNFR}, "component", &ds)
@@ -235,6 +237,16 @@ func lintSections(have []Heading, required []string, ds *diag.List) {
 
 // lintIDs checks ID format, numbering gaps, references to undefined IDs and IDs
 // deleted since the last approval. kinds are the kinds this document defines.
+// lintListed asks for the unqualified IDs of a list that starts with a
+// qualified one to be qualified as well.
+func lintListed(xs []CrossRef, ds *diag.List) {
+	for _, x := range xs {
+		if x.Listed {
+			ds.Warnf(x.Line, "%s follows a %s/ ID in a list and is read as %s/%s: write it that way (an unqualified ID always means this spec's own)", x.ID, x.Feature, x.Feature, x.ID)
+		}
+	}
+}
+
 func lintIDs(defs []Definition, refs []ref, opts LintOptions, kinds []Kind, ds *diag.List) {
 	previous := opts.PreviousIDs
 	defined := map[string]Definition{}

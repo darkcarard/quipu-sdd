@@ -189,7 +189,7 @@ var (
 	qualifiedRe = regexp.MustCompile(`(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)/$`)
 	// prefixRe matches the word before an ID ("admin-api AC-018", "`admin-api`'s AC-018").
 	// listSepRe matches what separates the IDs of a list.
-	listSepRe = regexp.MustCompile(`^\s*(?:,|&|\band\b|\bor\b|\by\b|\bo\b)?\s*(?:\band\b|\bor\b|\by\b|\bo\b)?\s*$`)
+	listSepRe = regexp.MustCompile("^`?\\s*(?:,|&|\\band\\b|\\bor\\b|\\by\\b|\\bo\\b)?\\s*(?:\\band\\b|\\bor\\b|\\by\\b|\\bo\\b)?\\s*`?$")
 	prefixRe  = regexp.MustCompile("(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:['’]s)?\\s+$")
 )
 
@@ -217,7 +217,7 @@ func findRefs(lines []markdown.Line) ([]ref, []CrossRef) {
 				prevFeature = ""
 				continue
 			case listed && prevQualified:
-				xs = append(xs, CrossRef{Feature: prevFeature, ID: id, Line: l.N})
+				xs = append(xs, CrossRef{Feature: prevFeature, ID: id, Line: l.N, Listed: true})
 				continue
 			}
 			r := ref{ID: id, Line: l.N}

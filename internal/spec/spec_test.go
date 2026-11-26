@@ -261,4 +261,19 @@ func TestCrossReferenceLists(t *testing.T) {
 	if ds.HasErrors() {
 		t.Errorf("a listed qualified ID was resolved here:\n%v", ds)
 	}
+	for _, id := range []string{"FR-002", "FR-003"} {
+		if !hasDiag(ds, want{diag.Warning, id + " follows a mock-domain/ ID in a list and is read as mock-domain/" + id}) {
+			t.Errorf("no warning for %s:\n%v", id, ds)
+		}
+	}
+	if hasDiag(ds, want{diag.Warning, "FR-001 follows"}) {
+		t.Errorf("the qualified ID was reported:\n%v", ds)
+	}
+
+	// Backticks around the IDs do not break the list.
+	src = strings.Replace(sddtest.Functional, "(see AC-001)", "(see `admin-auth/FR-008`, `FR-010`)", 1)
+	f, ds = lintFunctional(t, src, LintOptions{})
+	if xs := f.CrossRefs(); len(xs) != 2 || xs[1].ID != "FR-010" || !xs[1].Listed || ds.HasErrors() {
+		t.Errorf("backticked list: %+v\n%v", xs, ds)
+	}
 }

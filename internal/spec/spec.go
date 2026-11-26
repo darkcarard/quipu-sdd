@@ -81,6 +81,10 @@ type CrossRef struct {
 	Feature string
 	ID      string
 	Line    int
+	// Listed is set for an unqualified ID that follows a qualified one in a
+	// list ("admin-auth/FR-008, FR-010"): it is read as that feature's, and
+	// lint asks for it to be qualified.
+	Listed bool
 }
 
 // Meta is the common frontmatter.
