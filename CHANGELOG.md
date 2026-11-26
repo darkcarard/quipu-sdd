@@ -4,6 +4,12 @@ All notable changes to Quipu (`sdd`). Versions follow [semantic versioning](http
 
 To update: `go install github.com/darkcarard/quipu-sdd/cmd/sdd@latest`, then `sdd init --agent <your agents>` in each project to add the new integration files (see the README).
 
+## Unreleased
+
+### Fixed
+- Spec lint only reported the first ID of a list written after another feature's name (`admin-auth FR-008, FR-010`); every listed ID is now taken as that feature's. A list after a qualified ID (`mock-domain/FR-001, FR-002`) is qualified too.
+- `sdd status` showed the worktree and the branch of a merged feature after they were removed or deleted. It now shows where the feature was merged and only the worktree and branch that still exist, and the Next text suggests `sdd clean` or `git branch -d` only when there is something to remove.
+
 ## v0.3.0 (2026-11-26)
 
 ### Added

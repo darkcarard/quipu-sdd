@@ -95,6 +95,8 @@ func TestLintFunctional(t *testing.T) {
 			want{diag.Warning, "mock-domain FR-012 reads as a reference to feature mock-domain: write mock-domain/FR-012"}},
 		{"other feature's ID defined here too", "(see AC-001)", "(like `admin-api`'s AC-001)", LintOptions{OtherFeatures: []string{"admin-api"}},
 			want{diag.Warning, "admin-api AC-001 reads as a reference to feature admin-api"}},
+		{"list after another feature's name", "(see AC-001)", "(see `admin-auth` FR-008, FR-010 and AC-001)", LintOptions{OtherFeatures: []string{"admin-auth"}},
+			want{diag.Warning, "admin-auth FR-010 reads as a reference to feature admin-auth: write admin-auth/FR-010"}},
 		{"missing non-goals", "## Non-Goals\n\n- Social login.\n", "", LintOptions{},
 			want{diag.Error, `missing required section "## Non-Goals"`}},
 	}
@@ -220,7 +222,7 @@ func TestIDHelpers(t *testing.T) {
 }
 
 func TestCrossFeatureReferences(t *testing.T) {
-	src := strings.Replace(sddtest.Functional, "(see AC-001)", "(see AC-001, mock-domain/FR-012 and admin-api AC-018)", 1)
+	src := strings.Replace(sddtest.Functional, "(see AC-001)", "(see AC-001, mock-domain/FR-012 and admin-api AC-018; AC-002)", 1)
 	f, ds := lintFunctional(t, src, LintOptions{OtherFeatures: []string{"admin-api", "mock-domain"}})
 	if xs := f.CrossRefs(); len(xs) != 1 || xs[0].Feature != "mock-domain" || xs[0].ID != "FR-012" || xs[0].Line == 0 {
 		t.Errorf("cross refs = %+v", f.CrossRefs())
@@ -243,5 +245,20 @@ func TestCrossFeatureReferences(t *testing.T) {
 	}
 	if ds := CheckTechnical(fn, tech); !hasDiag(ds, want{diag.Error, "FR-009 is not defined in functional.md"}) {
 		t.Errorf("without the feature list: got:\n%v", ds)
+	}
+}
+
+func TestCrossReferenceLists(t *testing.T) {
+	src := strings.Replace(sddtest.Functional, "(see AC-001)", "(see mock-domain/FR-001, FR-002 and FR-003; this AC-001)", 1)
+	f, ds := lintFunctional(t, src, LintOptions{})
+	var got []string
+	for _, x := range f.CrossRefs() {
+		got = append(got, x.Feature+"/"+x.ID)
+	}
+	if !reflect.DeepEqual(got, []string{"mock-domain/FR-001", "mock-domain/FR-002", "mock-domain/FR-003"}) {
+		t.Errorf("cross refs = %v", got)
+	}
+	if ds.HasErrors() {
+		t.Errorf("a listed qualified ID was resolved here:\n%v", ds)
 	}
 }

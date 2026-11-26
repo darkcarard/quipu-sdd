@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -160,6 +161,20 @@ func (f *Feature) reload() error {
 
 // Merged reports whether the feature's branch was merged with `sdd merge`.
 func (f *Feature) Merged() bool { return f.State.Merged != nil && !f.Baseline() }
+
+// WorktreeExists reports whether the feature's worktree directory exists.
+func (f *Feature) WorktreeExists() bool {
+	_, err := os.Stat(f.Layout.WorktreeDir(f.Name))
+	return err == nil
+}
+
+// BranchExists reports whether the feature's branch sdd/<feature> exists in
+// the project repository (false outside a git repository).
+func (f *Feature) BranchExists() bool {
+	cmd := exec.Command("git", "rev-parse", "--verify", "--quiet", "refs/heads/sdd/"+f.Name)
+	cmd.Dir = f.Layout.Root
+	return cmd.Run() == nil
+}
 
 // Errata returns the artifacts of a merged feature that wait for the user to
 // approve them as errata: edited after their approval, or stale with every
@@ -499,10 +514,17 @@ func (f *Feature) Next() string {
 				a := errata[0]
 				return fmt.Sprintf("specs/%s/%s was edited after the merge: review the erratum, then the user approves it with `%s` (the feature stays validated; derived artifacts are restamped, not re-approved)", n, FileName(a), ApproveCommand(n, a))
 			}
-			if _, err := os.Stat(f.Layout.WorktreeDir(n)); err == nil {
-				return fmt.Sprintf("nothing to implement: sdd/%s was merged into %s. Remove the leftover worktree with `sdd clean %s`; if the branch still exists, delete it with `git branch -d sdd/%s`", n, m.Into, n, n)
+			var todo []string
+			if f.WorktreeExists() {
+				todo = append(todo, fmt.Sprintf("remove the leftover worktree with `sdd clean %s`", n))
 			}
-			return fmt.Sprintf("nothing: sdd/%s was merged into %s; if the branch still exists, delete it with `git branch -d sdd/%s` once you no longer need it", n, m.Into, n)
+			if f.BranchExists() {
+				todo = append(todo, fmt.Sprintf("delete the branch with `git branch -d sdd/%s` once you no longer need it", n))
+			}
+			if len(todo) == 0 {
+				return fmt.Sprintf("nothing: sdd/%s was merged into %s", n, m.Into)
+			}
+			return fmt.Sprintf("nothing: sdd/%s was merged into %s; %s", n, m.Into, strings.Join(todo, ", and "))
 		}
 		return fmt.Sprintf("merge it with `sdd merge %s` (into the branch checked out in the project, from any directory; removes the worktree), or merge sdd/%s your own way (PR, rebase) and then run `sdd merge %s` to record it", n, n, n)
 	}

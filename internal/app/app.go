@@ -294,6 +294,10 @@ type Detail struct {
 	Worktree string                `json:"worktree,omitempty"`
 	Branch   string                `json:"branch,omitempty"`
 	Groups   []implement.GroupView `json:"groups,omitempty"`
+	// MergedInto and MergedSHA record `sdd merge`. Worktree and Branch are
+	// only set while they exist.
+	MergedInto string `json:"merged_into,omitempty"`
+	MergedSHA  string `json:"merged_sha,omitempty"`
 }
 
 // Status returns the detailed status of one feature.
@@ -304,7 +308,16 @@ func (a *App) Status(arg string) (Detail, error) {
 	}
 	d := Detail{Summary: summarize(f), Description: f.State.Description, Next: f.Next()}
 	if len(f.State.Groups) > 0 {
-		d.Worktree, d.Branch, d.Groups = f.State.Worktree, f.State.Branch, implement.Progress(f)
+		d.Groups = implement.Progress(f)
+		if f.WorktreeExists() {
+			d.Worktree = f.State.Worktree
+		}
+		if f.State.Branch != "" && f.BranchExists() {
+			d.Branch = f.State.Branch
+		}
+		if m := f.State.Merged; m != nil {
+			d.MergedInto, d.MergedSHA = m.Into, m.SHA
+		}
 	}
 	if f.Saved && f.State.Phase != f.Phase {
 		d.StoredPhase = string(f.State.Phase)

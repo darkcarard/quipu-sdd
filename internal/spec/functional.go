@@ -188,7 +188,9 @@ var (
 	// qualifiedRe matches the feature of a <feature>/<ID> reference, at the end of the text before the ID.
 	qualifiedRe = regexp.MustCompile(`(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)/$`)
 	// prefixRe matches the word before an ID ("admin-api AC-018", "`admin-api`'s AC-018").
-	prefixRe = regexp.MustCompile("(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:['’]s)?\\s+$")
+	// listSepRe matches what separates the IDs of a list.
+	listSepRe = regexp.MustCompile(`^\s*(?:,|&|\band\b|\bor\b|\by\b|\bo\b)?\s*(?:\band\b|\bor\b|\by\b|\bo\b)?\s*$`)
+	prefixRe  = regexp.MustCompile("(?:^|[^a-z0-9/-])([a-z0-9]+(?:-[a-z0-9]+)*)`?(?:['’]s)?\\s+$")
 )
 
 // findRefs returns every spec ID mentioned in lines, and separately the
@@ -197,19 +199,35 @@ func findRefs(lines []markdown.Line) ([]ref, []CrossRef) {
 	var out []ref
 	var xs []CrossRef
 	for _, l := range lines {
+		// A list continues the previous ID's feature: "admin-auth FR-008, FR-010",
+		// "mock-domain/FR-001 and FR-002".
+		var prevEnd int
+		var prevFeature string
+		var prevQualified bool
 		for _, loc := range anyIDRe.FindAllStringIndex(l.Text, -1) {
 			id, before := l.Text[loc[0]:loc[1]], l.Text[:loc[0]]
-			if strings.HasSuffix(before, "/") {
-				if m := qualifiedRe.FindStringSubmatch(before); m != nil {
-					xs = append(xs, CrossRef{Feature: m[1], ID: id, Line: l.N})
-				}
+			listed := prevFeature != "" && listSepRe.MatchString(l.Text[prevEnd:loc[0]])
+			prevEnd = loc[1]
+			switch m := qualifiedRe.FindStringSubmatch(before); {
+			case strings.HasSuffix(before, "/") && m != nil:
+				xs = append(xs, CrossRef{Feature: m[1], ID: id, Line: l.N})
+				prevFeature, prevQualified = m[1], true
+				continue
+			case strings.HasSuffix(before, "/"):
+				prevFeature = ""
+				continue
+			case listed && prevQualified:
+				xs = append(xs, CrossRef{Feature: prevFeature, ID: id, Line: l.N})
 				continue
 			}
 			r := ref{ID: id, Line: l.N}
 			if m := prefixRe.FindStringSubmatch(before); m != nil {
 				r.Prefix = m[1]
+			} else if listed {
+				r.Prefix = prevFeature
 			}
 			out = append(out, r)
+			prevFeature, prevQualified = r.Prefix, false
 		}
 	}
 	return out, xs

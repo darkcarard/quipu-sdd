@@ -251,4 +251,17 @@ func TestErratumAfterMergeCLI(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".sdd", "worktrees", sddtest.Feature)); !os.IsNotExist(err) {
 		t.Errorf("validate recreated the worktree: %v", err)
 	}
+
+	// Status shows only what still exists.
+	out := mustRun(t, dir, ExitOK, "status", sddtest.Feature)
+	contains(t, out, "Implementation (merged into main at ", ", branch sdd/user-signup):", "`git branch -d sdd/user-signup`")
+	if strings.Contains(out, "worktree .sdd/worktrees") {
+		t.Errorf("status shows a removed worktree:\n%s", out)
+	}
+	git("branch", "-D", "sdd/user-signup")
+	out = mustRun(t, dir, ExitOK, "status", sddtest.Feature)
+	contains(t, out, "Next: nothing: sdd/user-signup was merged into main\n")
+	if strings.Contains(out, "branch sdd/user-signup") || strings.Contains(out, "git branch -d") {
+		t.Errorf("status shows a deleted branch:\n%s", out)
+	}
 }

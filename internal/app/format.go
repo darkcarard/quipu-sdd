@@ -130,7 +130,20 @@ func FormatDetail(d Detail) string {
 		}
 	}
 	if len(d.Groups) > 0 {
-		fmt.Fprintf(&sb, "\nImplementation (worktree %s, branch %s):\n", d.Worktree, d.Branch)
+		var where []string
+		if d.MergedInto != "" {
+			where = append(where, fmt.Sprintf("merged into %s at %s", d.MergedInto, ShortSHA(d.MergedSHA)))
+		}
+		if d.Worktree != "" {
+			where = append(where, "worktree "+d.Worktree)
+		}
+		if d.Branch != "" {
+			where = append(where, "branch "+d.Branch)
+		}
+		if len(where) == 0 {
+			where = append(where, "no worktree or branch left")
+		}
+		fmt.Fprintf(&sb, "\nImplementation (%s):\n", strings.Join(where, ", "))
 		sb.WriteString(FormatGroups(d.Groups))
 	}
 	if d.Lock != "" {
